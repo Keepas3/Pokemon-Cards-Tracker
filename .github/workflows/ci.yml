@@ -1,0 +1,27 @@
+name: CI
+
+# Every push and pull request must pass the same checks you'd run by hand. Railway can be set to
+# deploy `main` only after these pass ("Wait for CI" in the service's deploy settings).
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    env:
+      # Only the build and the tests' own temporary databases need a value; no real database is used.
+      DATABASE_URL: file:./ci.db
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npx tsc --noEmit
+      - run: npx eslint .
+      - run: npx vitest run
+      - run: npm run build

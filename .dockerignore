@@ -1,0 +1,23 @@
+node_modules
+.next
+.git
+.github
+.claude
+
+# Secrets and local data never go into an image.
+.env
+.env.*
+!.env.example
+prisma/*.db
+prisma/*.db-journal
+prisma/*.bak
+prisma/backups
+*.bak
+
+# Generated; rebuilt inside the image.
+src/generated
+
+*.log
+npm-debug.log*
+Dockerfile
+.dockerignore

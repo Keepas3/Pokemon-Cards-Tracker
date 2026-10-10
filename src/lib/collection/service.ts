@@ -1,0 +1,157 @@
+// The collection against the saved data: record what you own, and build the
+// gallery and set pages. Spends no tcgapi.dev requests; the card catalog (TCGdex)
+// is fetched lazily and cached (see lib/official/service.ts).
+
+import { prisma } from "@/lib/prisma";
+import { classifyItem } from "@/lib/sets/classify";
+import { toItemDTO } from "@/lib/sets/setsService";
+import { ensureOfficialIndex } from "@/lib/official/service";
+import { cardKey } from "./numbers";
+import { summarize } from "./progress";
+import { loadSetCollection } from "./setData";
+import type { OwnedInput } from "./input";
+import type {
+  CollectionSetPayload,
+  GalleryPayload,
+  GallerySeriesDTO,
+  GallerySetDTO,
+  OwnedResult,
+} from "./types";
+
+/**
+ * Sets how many copies of one card you own, any printing (0 removes it). Only a
+ * card in the set's list can be owned — not a box or a code card. Returns the
+ * set's refreshed summary so the page can update without reloading.
+ */
+export async function setOwned(profileId: string, input: OwnedInput): Promise<{ status: "ok"; result: OwnedResult } | { status: "no-set" } | { status: "no-card" }> {
+  const set = await prisma.cardSet.findUnique({ where: { id: input.setId } });
+  if (!set) return { status: "no-set" };
+  const key = cardKey(input.number);
+  if (key == null) return { status: "no-card" };
+
+  let collection = await loadSetCollection(set, { fetchOfficial: false, profileId });
+  let card = collection.cards.find((c) => c.key === key);
+  if (!card) {
+    // The set's official card list may simply not be saved yet (it's fetched when a set page is opened).
+    // Get it once (a free TCGdex request, cached for weeks; no tcgapi.dev requests) and look again.
+    collection = await loadSetCollection(set, { fetchOfficial: true, profileId });
+    card = collection.cards.find((c) => c.key === key);
+  }
+  if (!card) return { status: "no-card" };
+
+  const where = { profileId_setId_numberKey: { profileId, setId: set.id, numberKey: key } };
+  if (input.quantity === 0) {
+    await prisma.ownedCard.deleteMany({ where: { profileId, setId: set.id, numberKey: key } });
+  } else {
+    await prisma.ownedCard.upsert({
+      where,
+      create: { profileId, setId: set.id, numberKey: key, number: card.number, name: card.name, quantity: input.quantity },
+      update: { quantity: input.quantity, number: card.number, name: card.name },
+    });
+  }
+
+  const cards = collection.cards.map((c) => (c.key === key ? { ...c, owned: input.quantity } : c));
+  return {
+    status: "ok",
+    result: { ok: true, quantity: input.quantity, summary: summarize(cards, collection.usedOfficial ? "official" : "tcgapi") },
+  };
+}
+
+const OTHER = { id: "other", name: "Other sets" };
+
+/** Every set, grouped by series, with how far along one person is in each. */
+export async function loadGallery(profileId: string): Promise<GalleryPayload> {
+  const error = await ensureOfficialIndex();
+
+  const [sets, officials, ownedBySet] = await Promise.all([
+    prisma.cardSet.findMany(),
+    prisma.officialSet.findMany({ where: { cardSetId: { not: null } } }),
+    prisma.ownedCard.groupBy({ by: ["setId"], where: { profileId }, _count: { _all: true }, _sum: { quantity: true } }),
+  ]);
+  const officialBySet = new Map(officials.map((o) => [o.cardSetId as number, o]));
+  const owned = new Map(ownedBySet.map((o) => [o.setId, { cards: o._count._all, copies: o._sum.quantity ?? 0 }]));
+
+  // Sets you've started get their real summary (total, value); the rest only need a count.
+  const summaries = new Map<number, ReturnType<typeof summarize>>();
+  for (const set of sets) {
+    if (!owned.has(set.id)) continue;
+    summaries.set(set.id, (await loadSetCollection(set, { fetchOfficial: false, profileId })).summary);
+  }
+
+  const bySeries = new Map<string, { series: GallerySeriesDTO; newest: number; entries: { dto: GallerySetDTO; time: number }[] }>();
+  for (const set of sets) {
+    const official = officialBySet.get(set.id) ?? null;
+    const started = owned.get(set.id);
+    const summary = summaries.get(set.id);
+    const total = summary?.totalCards ?? official?.totalCards ?? null;
+    const ownedCards = summary?.ownedCards ?? started?.cards ?? 0;
+
+    const dto: GallerySetDTO = {
+      slug: set.slug,
+      name: official?.name ?? set.name,
+      logoUrl: official?.logoUrl ?? null,
+      symbolUrl: official?.symbolUrl ?? null,
+      releaseDate: set.releaseDate?.toISOString() ?? null,
+      totalCards: total,
+      ownedCards,
+      copies: started?.copies ?? 0,
+      percent: total ? Math.round((ownedCards / total) * 1000) / 10 : null,
+      official: official != null,
+    };
+
+    const seriesInfo = official ? { id: official.seriesId, name: official.seriesName } : OTHER;
+    const time = set.releaseDate?.getTime() ?? 0;
+    const group = bySeries.get(seriesInfo.id) ?? { series: { ...seriesInfo, sets: [] }, newest: 0, entries: [] };
+    group.entries.push({ dto, time });
+    group.newest = Math.max(group.newest, time);
+    bySeries.set(seriesInfo.id, group);
+  }
+
+  const series = [...bySeries.values()]
+    .sort((a, b) => (a.series.id === OTHER.id ? 1 : b.series.id === OTHER.id ? -1 : b.newest - a.newest))
+    .map((g) => ({
+      ...g.series,
+      sets: g.entries.sort((a, b) => b.time - a.time || a.dto.name.localeCompare(b.dto.name)).map((e) => e.dto),
+    }));
+
+  const started = [...summaries.values()];
+  return {
+    series,
+    totals: {
+      started: started.length,
+      complete: started.filter((s) => s.totalCards > 0 && s.ownedCards === s.totalCards).length,
+      copies: started.reduce((n, s) => n + s.copies, 0),
+      valueCents: started.reduce((n, s) => n + s.valueCents, 0),
+    },
+    error,
+  };
+}
+
+/** One set's page: every card with what a person owns, the summary, and the set's other rows. */
+export async function loadCollectionSet(profileId: string, slug: string): Promise<CollectionSetPayload | null> {
+  const set = await prisma.cardSet.findUnique({ where: { slug } });
+  if (!set) return null;
+  const collection = await loadSetCollection(set, { fetchOfficial: true, profileId });
+
+  const products = collection.items
+    .map((i) => ({ item: i, group: classifyItem(i) }))
+    .filter((x) => x.group !== "card")
+    .sort((a, b) => (b.item.marketPriceCents ?? -1) - (a.item.marketPriceCents ?? -1))
+    .map((x) => toItemDTO(x.item, x.group, null, 0));
+
+  return {
+    set: {
+      id: set.id,
+      slug: set.slug,
+      name: collection.officialSet?.name ?? set.name,
+      seriesName: collection.officialSet?.seriesName ?? null,
+      logoUrl: collection.officialSet?.logoUrl ?? null,
+      releaseDate: set.releaseDate?.toISOString() ?? null,
+      official: collection.usedOfficial,
+    },
+    cards: collection.cards,
+    summary: collection.summary,
+    products,
+    error: collection.error,
+  };
+}

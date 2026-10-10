@@ -1,26 +1,328 @@
 @import "tailwindcss";
 
+/*
+ * Theme. Every color on the site comes from these variables, so changing the
+ * look (or adding a theme) is a change here and nowhere else.
+ *
+ *   light  = :root                                (default)
+ *   dark   = follows the system unless the user chose light, or is forced
+ *            with [data-theme="dark"] (see components/shell/ThemeToggle).
+ *
+ * The dark values appear twice (system preference, explicit choice) because CSS
+ * can't share one block between a media query and an attribute selector;
+ * src/lib/__tests__/theme.test.ts fails if the two copies ever drift apart.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+  color-scheme: light;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --bg: #fafaf9;
+  --surface: #ffffff;
+  --surface-2: #f4f4f2;
+  --line: #e7e5e0;
+  --line-strong: #d6d3cc;
+
+  --fg: #1c1b19;
+  --muted: #5f5d57;
+  --subtle: #8a877f;
+
+  --accent: #4f46e5;
+  --accent-fg: #ffffff;
+  --accent-soft: #eef0ff;
+  --accent-text: #4338ca;
+
+  --good: #14793a;
+  --good-soft: #e8f6ec;
+  --warn: #a94f08;
+  --warn-soft: #fdf3e1;
+  --bad: #b91c1c;
+  --bad-soft: #fdecec;
+
+  /* Set logos are drawn for light backgrounds; in dark they get a faint halo so dark lettering stays readable. */
+  --logo-filter: none;
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+
+    --bg: #0f1012;
+    --surface: #17181b;
+    --surface-2: #1f2024;
+    --line: #2a2b30;
+    --line-strong: #3a3b41;
+
+    --fg: #ececea;
+    --muted: #a3a29d;
+    --subtle: #76757a;
+
+    --accent: #5d60ee;
+    --accent-fg: #ffffff;
+    --accent-soft: #1c1f3a;
+    --accent-text: #a5b4fc;
+
+    --good: #4ade80;
+    --good-soft: #10261a;
+    --warn: #fbbf24;
+    --warn-soft: #2b2210;
+    --bad: #f87171;
+    --bad-soft: #2c1416;
+
+    --logo-filter: drop-shadow(0 0 1px rgb(255 255 255 / 0.7)) drop-shadow(0 0 5px rgb(255 255 255 / 0.22));
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg: #0f1012;
+  --surface: #17181b;
+  --surface-2: #1f2024;
+  --line: #2a2b30;
+  --line-strong: #3a3b41;
+
+  --fg: #ececea;
+  --muted: #a3a29d;
+  --subtle: #76757a;
+
+  --accent: #5d60ee;
+  --accent-fg: #ffffff;
+  --accent-soft: #1c1f3a;
+  --accent-text: #a5b4fc;
+
+  --good: #4ade80;
+  --good-soft: #10261a;
+  --warn: #fbbf24;
+  --warn-soft: #2b2210;
+  --bad: #f87171;
+  --bad-soft: #2c1416;
+
+  --logo-filter: drop-shadow(0 0 1px rgb(255 255 255 / 0.7)) drop-shadow(0 0 5px rgb(255 255 255 / 0.22));
+}
+
+/* Expose the variables as Tailwind utilities: bg-surface, text-muted, border-line, … */
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-subtle: var(--subtle);
+  --color-accent: var(--accent);
+  --color-accent-fg: var(--accent-fg);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-text: var(--accent-text);
+  --color-good: var(--good);
+  --color-good-soft: var(--good-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-bad: var(--bad);
+  --color-bad-soft: var(--bad-soft);
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+@layer base {
+  html {
+    background: var(--bg);
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-sans);
+    font-size: 0.875rem;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* One consistent, visible keyboard focus ring. */
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: var(--accent-soft);
+    color: var(--accent-text);
+  }
+
+  summary {
+    cursor: pointer;
+  }
+
+  /*
+   * The open list of a <select> is drawn by the browser, and on Windows it
+   * ignores the select's own colors unless the options set them too — which is
+   * what made dropdowns white-on-white in dark mode.
+   */
+  select,
+  select option,
+  select optgroup {
+    background-color: var(--surface);
+    color: var(--fg);
+  }
+  select option:checked {
+    background-color: var(--accent-soft);
+    color: var(--accent-text);
+  }
+}
+
+/*
+ * Shared building blocks. Using these (instead of repeating long class strings)
+ * is what keeps buttons, inputs and cards looking like one product. Tailwind
+ * utilities still win over them, so `btn px-2` and `input w-24` work.
+ */
+@layer components {
+  .logo-img {
+    filter: var(--logo-filter);
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 0.75rem;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    border-radius: 0.5rem;
+    border: 1px solid var(--line-strong);
+    background: var(--surface);
+    color: var(--fg);
+    padding: 0.375rem 0.75rem;
+    font-size: 0.8125rem;
+    line-height: 1.25rem;
+    font-weight: 500;
+    white-space: nowrap;
+    cursor: pointer;
+    transition:
+      background-color 120ms,
+      border-color 120ms,
+      color 120ms;
+  }
+  .btn:hover {
+    background: var(--surface-2);
+  }
+  .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-fg);
+  }
+  .btn-primary:hover {
+    background: var(--accent);
+    filter: brightness(1.08);
+  }
+
+  .btn-good {
+    background: var(--good);
+    border-color: var(--good);
+    color: var(--bg);
+  }
+  .btn-good:hover {
+    background: var(--good);
+    filter: brightness(1.08);
+  }
+
+  .btn-ghost {
+    border-color: transparent;
+    background: transparent;
+    color: var(--muted);
+  }
+  .btn-ghost:hover {
+    background: var(--surface-2);
+    color: var(--fg);
+  }
+
+  .btn-sm {
+    padding: 0.2rem 0.5rem;
+    font-size: 0.75rem;
+    line-height: 1.1rem;
+  }
+
+  /* Inputs, selects and textareas. */
+  .input {
+    border-radius: 0.5rem;
+    border: 1px solid var(--line-strong);
+    background: var(--surface);
+    color: var(--fg);
+    padding: 0.375rem 0.625rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    transition: border-color 120ms;
+  }
+  .input::placeholder {
+    color: var(--subtle);
+  }
+  .input:hover {
+    border-color: var(--subtle);
+  }
+  .input:disabled {
+    opacity: 0.5;
+  }
+
+  /* Small status labels. */
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    border-radius: 9999px;
+    background: var(--surface-2);
+    color: var(--muted);
+    padding: 0.0625rem 0.5rem;
+    font-size: 0.75rem;
+    line-height: 1.25rem;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .chip-good {
+    background: var(--good-soft);
+    color: var(--good);
+  }
+  .chip-warn {
+    background: var(--warn-soft);
+    color: var(--warn);
+  }
+  .chip-bad {
+    background: var(--bad-soft);
+    color: var(--bad);
+  }
+  .chip-accent {
+    background: var(--accent-soft);
+    color: var(--accent-text);
+  }
+
+  /* Prices and counts: digits of equal width, so columns line up. */
+  .num {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* A quiet inline text button/link. */
+  .link {
+    color: var(--accent-text);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .link:hover {
+    text-decoration-thickness: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
 }

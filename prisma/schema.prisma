@@ -1,0 +1,538 @@
+// Pokemon Sealed Product Restock Tracker — schema
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+enum ProductType {
+  BOOSTER_BOX
+  ELITE_TRAINER_BOX
+}
+
+enum Retailer {
+  POKEMON_CENTER
+  BEST_BUY
+  TARGET
+}
+
+// MANUAL: user typed in a specific product/retailer id via "Track a new product".
+// CATALOG: created by the background catalog importer (see src/lib/catalog/).
+// Catalog-sourced links are refreshed in bulk by the importer itself and are
+// excluded from the per-link poll loop, so the two sources never double-poll
+// the same retailer.
+enum RetailerLinkSource {
+  MANUAL
+  CATALOG
+}
+
+// LEGACY (unused): retail restock tracking was removed from the app. The table stays so data you
+// already saved isn't dropped; nothing reads or writes it.
+model Product {
+  id               String      @id @default(cuid())
+  name             String
+  setName          String
+  productType      ProductType
+  imageUrl         String?
+  msrpCents        Int?
+  // From the retailer's own listing (e.g. Pokémon Center's `launch_date`) when
+  // known — powers Newest/Oldest sort on the Browse page.
+  releaseDate      DateTime?
+  // The matching sealed row in the Browse-by-set data (see src/lib/openOrHold/):
+  // set id + tcgapi.dev product id + printing. Plain numbers rather than a
+  // relation, because SetItem rows are deleted and recreated on every refresh.
+  marketSetId      Int?
+  marketExternalId Int?
+  marketPrinting   String?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  retailerLinks  RetailerLink[]
+  watchlistEntry WatchlistEntry?
+}
+
+// LEGACY (unused): retail restock tracking was removed from the app. The table stays so data you
+// already saved isn't dropped; nothing reads or writes it.
+model RetailerLink {
+  id         String             @id @default(cuid())
+  productId  String
+  product    Product            @relation(fields: [productId], references: [id], onDelete: Cascade)
+  retailer   Retailer
+  // Retailer-specific identifier used by the adapter to look the product up
+  // (e.g. Shopify product handle, Best Buy SKU, Target TCIN).
+  externalId String
+  url        String
+  source     RetailerLinkSource @default(MANUAL)
+
+  lastInStock    Boolean   @default(false)
+  lastPriceCents Int?
+  lastCheckedAt  DateTime?
+  lastError      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  stockEvents StockEvent[]
+
+  @@unique([retailer, externalId])
+  @@index([productId])
+}
+
+// Presence of a row = this product is actively watched for notifications.
+// Absence = it's just catalog data, browsable but silent.
+// LEGACY (unused): retail restock tracking was removed from the app. The table stays so data you
+// already saved isn't dropped; nothing reads or writes it.
+model WatchlistEntry {
+  id        String  @id @default(cuid())
+  productId String  @unique
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  notifyOnRestock            Boolean @default(true)
+  // Notify when the best in-stock price drops to or below this. Null = no
+  // threshold alert, restock-only.
+  thresholdCents             Int?
+  // The price we last fired a threshold alert at, so we don't re-notify every
+  // poll while price stays low. Cleared once price rises back above the
+  // threshold, so a later dip alerts again.
+  lastNotifiedThresholdCents Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// LEGACY (unused): retail restock tracking was removed from the app. The table stays so data you
+// already saved isn't dropped; nothing reads or writes it.
+model StockEvent {
+  id             String       @id @default(cuid())
+  retailerLinkId String
+  retailerLink   RetailerLink @relation(fields: [retailerLinkId], references: [id], onDelete: Cascade)
+
+  wasInStock Boolean
+  isInStock  Boolean
+  priceCents Int?
+  notified   Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@index([retailerLinkId])
+}
+
+// LEGACY (unused): the single settings row of the one-person app. Its values were copied onto
+// the first Profile when profiles were added; nothing reads or writes it any more.
+model NotificationConfig {
+  id                   String    @id @default("singleton")
+  discordWebhookUrl    String?
+  enabled              Boolean   @default(true)
+  pollIntervalSec      Int       @default(180)
+  quietHoursStart      Int?
+  quietHoursEnd        Int?
+  // Morning digest: one Discord summary a day at `digestHour` (server-local
+  // time). Off until the user turns it on.
+  digestEnabled        Boolean   @default(false)
+  digestHour           Int       @default(9)
+  lastDigestAt         DateTime?
+  // Pokémon Center and Target have no public API: checking them calls the same
+  // hidden endpoints their own websites use, which their terms of use don't allow
+  // for automated tools. Both stay off until switched on in Settings.
+  pokemonCenterEnabled Boolean   @default(false)
+  targetEnabled        Boolean   @default(false)
+  updatedAt            DateTime  @updatedAt
+}
+
+// --- People ---
+// Two people share one site, each with their own collection, watched cards, alert rules and
+// Discord settings. Prices, sets and card lists are shared. The password is a gate, not a
+// full account system (see lib/auth/).
+
+model Profile {
+  id                   String    @id @default(cuid())
+  name                 String    @unique
+  // scrypt hash (lib/auth/password.ts). "" = not claimed yet: the first BOOTSTRAP_PROFILES
+  // entry or `npm run profile:set` gives it a name and password.
+  passwordHash         String    @default("")
+  discordWebhookUrl    String?
+  notificationsEnabled Boolean   @default(true)
+  quietHoursStart      Int?
+  quietHoursEnd        Int?
+  // Morning digest: one Discord summary a day at `digestHour` (server-local time).
+  digestEnabled        Boolean   @default(false)
+  digestHour           Int       @default(9)
+  lastDigestAt         DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  ownedCards      OwnedCard[]
+  smartWatches    SmartWatch[]
+  watchedCards    CardWatchlistEntry[]
+  followedPokemon FollowedPokemon[]
+  dealNotices     DealNotice[]
+}
+
+// --- Card singles (market-price tracking, distinct from sealed-product stock
+// tracking above — a card has no "in stock", only a price) ---
+
+enum CardPriceProvider {
+  JUSTTCG
+  TCGAPI_DEV
+}
+
+model Card {
+  id        String   @id @default(cuid())
+  name      String
+  setName   String
+  // Card number within its set, e.g. "199/165" — best-effort, not always known.
+  number    String?
+  imageUrl  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  priceSources     CardPriceSource[]
+  watchlistEntries CardWatchlistEntry[]
+}
+
+model CardPriceSource {
+  id         String            @id @default(cuid())
+  cardId     String
+  card       Card              @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  provider   CardPriceProvider
+  // The provider's own id for this specific card+printing.
+  externalId String
+  // e.g. "Holofoil", "Normal", "Reverse Holofoil" — a card can have several.
+  variant    String?
+  // Neither provider returns a direct buy link — this is a best-effort
+  // constructed tcgplayer.com search URL.
+  url        String
+
+  lastPriceCents    Int?
+  lastLowPriceCents Int?
+  lastCheckedAt     DateTime?
+  lastError         String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  priceEvents CardPriceEvent[]
+
+  @@unique([provider, externalId])
+  @@index([cardId])
+}
+
+// History log of price changes, mirrors StockEvent.
+model CardPriceEvent {
+  id                String          @id @default(cuid())
+  cardPriceSourceId String
+  cardPriceSource   CardPriceSource @relation(fields: [cardPriceSourceId], references: [id], onDelete: Cascade)
+
+  oldPriceCents Int?
+  newPriceCents Int?
+  notified      Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@index([cardPriceSourceId])
+}
+
+// Presence of a row = this card is watched for price-threshold alerts.
+// Threshold-only (no restock concept — a card is always "available").
+model CardWatchlistEntry {
+  id        String  @id @default(cuid())
+  cardId    String
+  card      Card    @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  profileId String
+  profile   Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  // null = tracked on this person's list, with no price alert.
+  thresholdCents             Int?
+  // Cleared once price rises back above the threshold, so a later dip alerts again.
+  lastNotifiedThresholdCents Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([cardId, profileId])
+  @@index([profileId])
+}
+
+// --- Browse-by-set cache (TCGplayer-style set pages) ---
+// Sourced from tcgapi.dev, whose free tier is ~100 requests/day, so everything
+// fetched here is persisted and re-served from SQLite until it goes stale.
+
+enum SetItemKind {
+  CARD
+  SEALED
+}
+
+model CardSet {
+  // tcgapi.dev / TCGplayer set id.
+  id             Int       @id
+  name           String
+  slug           String    @unique
+  releaseDate    DateTime?
+  cardCount      Int       @default(0)
+  iconUrl        String?
+  imageUrl       String?
+  // When this row last came from the sets-list endpoint.
+  fetchedAt      DateTime  @default(now())
+  // When the set's items were last fully fetched (null = never opened).
+  itemsFetchedAt DateTime?
+
+  items        SetItem[]
+  smartWatches SmartWatch[]
+  pullRates    PullRate[]
+  packCounts   PackCount[]
+  ownedCards   OwnedCard[]
+  official     OfficialSet?
+}
+
+model SetItem {
+  id               String      @id @default(cuid())
+  setId            Int
+  set              CardSet     @relation(fields: [setId], references: [id], onDelete: Cascade)
+  // tcgapi.dev's id for this product row — also what CardPriceSource.externalId
+  // holds when a set item gets watched, so the two line up.
+  externalId       Int
+  tcgplayerId      Int?
+  name             String
+  number           String?
+  rarity           String?
+  kind             SetItemKind
+  // "" rather than null so the unique key below behaves (SQLite treats NULLs
+  // as distinct in unique indexes).
+  printing         String      @default("")
+  marketPriceCents Int?
+  lowPriceCents    Int?
+  imageUrl         String?
+  priceUpdatedAt   DateTime?
+
+  @@unique([setId, externalId, printing])
+  @@index([setId])
+}
+
+// --- Smart watches: a rule about a set rather than one card ---
+// "Alert me when any Special Illustration Rare in ME: 30th Celebration is
+// $40 or less." Evaluated whenever that set's prices are fetched.
+
+model SmartWatch {
+  id            String       @id @default(cuid())
+  profileId     String
+  profile       Profile      @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  name          String
+  // A rule needs a specific set: "any set" would mean re-fetching every set
+  // daily, which the free API tier can't pay for.
+  setId         Int
+  set           CardSet      @relation(fields: [setId], references: [id], onDelete: Cascade)
+  // null = cards and sealed products both.
+  kind          SetItemKind?
+  rarity        String?
+  // Matches an item's name or card number, like the set page's search box.
+  query         String?
+  // Only cards whose number you don't own yet (see OwnedCard). Implies cards.
+  onlyMissing   Boolean      @default(false)
+  maxPriceCents Int
+  enabled       Boolean      @default(true)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  matches SmartWatchMatch[]
+
+  @@index([setId])
+  @@index([profileId])
+}
+
+// One row per item currently under the rule's limit. A row existing means "we
+// already know about this one" — so only new matches alert. A row is deleted
+// when its price rises back above the limit, so a later dip alerts again.
+model SmartWatchMatch {
+  id             String     @id @default(cuid())
+  smartWatchId   String
+  smartWatch     SmartWatch @relation(fields: [smartWatchId], references: [id], onDelete: Cascade)
+  itemExternalId Int
+  printing       String     @default("")
+  name           String
+  priceCents     Int
+  // null = an alert is still owed (a new match, or one held back by quiet hours
+  // or a failed send). Set once alerted, or straight away for the silent
+  // baseline taken when a rule is created or edited.
+  notifiedAt     DateTime?
+  // True for matches recorded silently when the rule was created or edited —
+  // things that already matched, as opposed to new ones the digest reports.
+  baseline       Boolean    @default(false)
+  createdAt      DateTime   @default(now())
+
+  @@unique([smartWatchId, itemExternalId, printing])
+}
+
+// One row per set per day from JustTCG's set list: total value and its recent
+// change. Feeds the digest's "biggest movers", and quietly accumulates a
+// price history of our own.
+model SetValueSnapshot {
+  id           String   @id @default(cuid())
+  jtcgSetId    String
+  name         String
+  valueCents   Int
+  change7dPct  Float?
+  change30dPct Float?
+  // UTC calendar day, "YYYY-MM-DD".
+  day          String
+  capturedAt   DateTime @default(now())
+
+  @@unique([jtcgSetId, day])
+  @@index([day])
+}
+
+// --- Open or hold: is a sealed product worth more opened or left sealed? ---
+// What the numbers assume, in one editable row. See src/lib/openOrHold/.
+
+model OpenHoldSettings {
+  id                 String   @id @default("singleton")
+  // Marketplace + payment fees taken off whatever you sell.
+  feePct             Float    @default(13)
+  // Cards worth less than this aren't worth listing one by one: counted as bulk.
+  bulkThresholdCents Int      @default(100)
+  // What the rest of a pack (the commons and bulk) is worth, if you sell it.
+  bulkPerPackCents   Int      @default(0)
+  updatedAt          DateTime @updatedAt
+}
+
+// A pull rate you've set yourself for one rarity in one set: the chance that a
+// single pack contains a card of that rarity. Overrides the published figure.
+model PullRate {
+  id        String   @id @default(cuid())
+  setId     Int
+  set       CardSet  @relation(fields: [setId], references: [id], onDelete: Cascade)
+  rarity    String
+  perPack   Float
+  updatedAt DateTime @updatedAt
+
+  @@unique([setId, rarity])
+}
+
+// Packs-per-product you've set yourself, for a sealed row in a set (keyed the
+// way Product's market link is, so it survives SetItem refreshes).
+model PackCount {
+  id             String   @id @default(cuid())
+  setId          Int
+  set            CardSet  @relation(fields: [setId], references: [id], onDelete: Cascade)
+  itemExternalId Int
+  printing       String   @default("")
+  packs          Int
+  updatedAt      DateTime @updatedAt
+
+  @@unique([setId, itemExternalId, printing])
+}
+
+// --- Collection: which cards you own, for set completion ---
+// Keyed on (set, card number) — the unit completion is counted in — so a card
+// can be owned whether or not tcgapi.dev lists a row for it, and a box or code
+// card (which has no card number) can't be. One row per number you own; deleted
+// when its quantity goes back to zero. Any printing counts: owning the Normal
+// 025/088 and the Reverse Holofoil 025/088 is two copies of one card.
+
+model OwnedCard {
+  id        String   @id @default(cuid())
+  profileId String
+  profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  setId     Int
+  set       CardSet  @relation(fields: [setId], references: [id], onDelete: Cascade)
+  // The card number's numerator, normalised (see lib/collection/numbers.ts):
+  // "025/088" and "25" are both "25".
+  numberKey String
+  // As printed ("025/088") and the card's name, for display if the set data changes.
+  number    String?
+  name      String
+  quantity  Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([profileId, setId, numberKey])
+  @@index([profileId, setId])
+  @@index([setId])
+}
+
+// --- Official catalog: the real card list for each set (TCGdex today) ---
+// tcgapi.dev gives prices but files boxes and code cards under "Cards" and only
+// lists what TCGplayer sells. The official list is the authority for "which
+// cards exist in this set", for logos and for series grouping. See lib/official/.
+
+model OfficialSet {
+  // The catalog's own id, e.g. "me03".
+  id             String    @id
+  name           String
+  seriesId       String
+  seriesName     String
+  releaseDate    DateTime?
+  logoUrl        String?
+  symbolUrl      String?
+  // Cards in the set including secret rares / the printed count.
+  totalCards     Int
+  officialCards  Int
+  // The tcgapi.dev set this one is (one-to-one), once matched.
+  cardSetId      Int?      @unique
+  cardSet        CardSet?  @relation(fields: [cardSetId], references: [id], onDelete: SetNull)
+  // When the card list below was last fetched (null = only the index so far).
+  cardsFetchedAt DateTime?
+  fetchedAt      DateTime  @default(now())
+
+  cards OfficialCard[]
+}
+
+model OfficialCard {
+  id            String      @id @default(cuid())
+  officialSetId String
+  officialSet   OfficialSet @relation(fields: [officialSetId], references: [id], onDelete: Cascade)
+  // Same normalisation as OwnedCard.numberKey, so the two join directly.
+  numberKey     String
+  // As the catalog prints it ("001", "TG05").
+  localId       String
+  name          String
+  imageUrl      String?
+  // Order in the set.
+  position      Int
+
+  @@unique([officialSetId, numberKey])
+  @@index([officialSetId])
+}
+
+// --- Collecting by Pokémon ---
+// TCGdex lists every card of one Pokémon (by Pokédex number) in a single request, across all
+// sets. The list is cached here as it came back; which of those cards you own is the same
+// OwnedCard data as the set pages, so owning a card in either view counts in both.
+
+model DexCache {
+  dexId     Int      @id
+  // The cards as TCGdex returned them: [{ id, localId, name, image? }].
+  cardsJson String
+  fetchedAt DateTime
+}
+
+// The Pokémon someone has chosen to collect (shown with progress on their Pokémon page).
+model FollowedPokemon {
+  profileId String
+  profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  dexId     Int
+  createdAt DateTime @default(now())
+
+  @@id([profileId, dexId])
+}
+
+// --- Deals ---
+// "A card you're missing is listed well under its market price." The digest only mentions a deal
+// when it's new to that person, or has got meaningfully cheaper since they were last told — this
+// remembers what each person has already been told about.
+
+model DealNotice {
+  profileId String
+  profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  setId     Int
+  numberKey String
+  // The lowest price (cents) at the time of the last notice.
+  lowCents  Int
+  noticedAt DateTime
+
+  @@id([profileId, setId, numberKey])
+}
