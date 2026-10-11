@@ -57,6 +57,41 @@ export function parseBootstrapEntries(value: string | undefined | null): Bootstr
   return out;
 }
 
+/**
+ * Why entries in BOOTSTRAP_PROFILES were left out, for the startup log: one line per dropped entry, saying
+ * which one (by position and name) and what is wrong. Never contains a password.
+ */
+export function bootstrapProblems(value: string | undefined | null): string[] {
+  const text = value?.trim();
+  if (!text) return [];
+  if (text.startsWith("[")) {
+    try {
+      if (!Array.isArray(JSON.parse(text))) return ["it starts with [ but isn't a JSON list"];
+    } catch {
+      return ["it starts with [ but isn't valid JSON; for the short form write Name:password,Name2:password2"];
+    }
+  }
+  const raw: { name?: unknown; password?: unknown; colonMissing?: boolean }[] = text.startsWith("[")
+    ? JSON.parse(text)
+    : text.split(",").map((pair) => {
+        const i = pair.indexOf(":");
+        // No name is kept for a piece without a colon: it may be the tail of a password that contained a comma.
+        return i < 0 ? { colonMissing: true } : { name: pair.slice(0, i), password: pair.slice(i + 1) };
+      });
+  const problems: string[] = [];
+  const seen = new Set<string>();
+  raw.forEach((entry, i) => {
+    const label = `entry ${i + 1}${typeof entry?.name === "string" && entry.name.trim() ? ` ("${entry.name.trim().slice(0, 20)}")` : ""}`;
+    const name = cleanName(entry?.name);
+    if (entry?.colonMissing) problems.push(`${label}: no ":" between a name and a password (a comma inside a password also splits it; use the JSON form for those)`);
+    else if (!name) problems.push(`${label}: no usable name`);
+    else if (passwordProblem(entry.password)) problems.push(`${label}: ${passwordProblem(entry.password)}`);
+    else if (seen.has(name.toLowerCase())) problems.push(`${label}: the same name is listed twice`);
+    else seen.add(name.toLowerCase());
+  });
+  return problems;
+}
+
 export interface ExistingProfile {
   id: string;
   name: string;

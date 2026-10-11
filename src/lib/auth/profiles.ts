@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { parseBootstrapEntries, planBootstrap } from "./bootstrap";
+import { bootstrapProblems, parseBootstrapEntries, planBootstrap } from "./bootstrap";
 import type { BootstrapEntry } from "./bootstrap";
 import { hashPassword, passwordProblem, verifyPassword } from "./password";
 
@@ -53,8 +53,13 @@ export async function applyBootstrap(entries: BootstrapEntry[], opts: { overwrit
  */
 export async function bootstrapFromEnv(env: Record<string, string | undefined> = process.env): Promise<void> {
   const entries = parseBootstrapEntries(env.BOOTSTRAP_PROFILES);
-  if (env.BOOTSTRAP_PROFILES && entries.length === 0) {
-    console.warn("[auth] BOOTSTRAP_PROFILES is set but has no usable entries (names, and passwords of 8+ characters).");
+  if (!env.BOOTSTRAP_PROFILES?.trim()) {
+    console.warn("[auth] BOOTSTRAP_PROFILES is not set (or is empty), so no profiles are created. Set it on this service and redeploy: Name:password,Name2:password2");
+    return;
+  }
+  for (const problem of bootstrapProblems(env.BOOTSTRAP_PROFILES)) console.warn(`[auth] BOOTSTRAP_PROFILES: ${problem}`);
+  if (entries.length === 0) {
+    console.warn("[auth] BOOTSTRAP_PROFILES is set but has no usable entries (each needs a name and a password of 8+ characters).");
     return;
   }
   const overwrite = env.BOOTSTRAP_OVERWRITE === "1";

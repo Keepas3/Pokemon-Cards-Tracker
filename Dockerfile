@@ -27,4 +27,4 @@ EXPOSE 3000
 
 # Apply any new migrations, then serve. PORT is set by the host. A failed migration stops the container
 # (and the host restarts it) rather than serving a half-updated database.
-CMD ["sh", "-c", "node_modules/.bin/prisma migrate deploy && exec node_modules/.bin/next start -H 0.0.0.0 -p ${PORT:-3000}"]
+CMD ["sh", "-c", "if [ -z \"$DATABASE_URL\" ]; then echo \"DATABASE_URL is not set. Add DATABASE_URL=file:/data/app.db to the service Variables (with a volume mounted at /data), apply the change and redeploy.\"; exit 1; fi; node_modules/.bin/prisma migrate deploy && exec node_modules/.bin/next start -H 0.0.0.0 -p ${PORT:-3000}"]

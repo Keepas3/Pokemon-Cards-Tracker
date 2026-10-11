@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cleanName, parseBootstrapEntries, planBootstrap } from "../bootstrap";
+import { bootstrapProblems, cleanName, parseBootstrapEntries, planBootstrap } from "../bootstrap";
 
 describe("parseBootstrapEntries", () => {
   it("reads the short form, splitting on the first colon only", () => {
@@ -83,5 +83,30 @@ describe("planBootstrap", () => {
     const plan = planBootstrap([owner], [{ name: "A", password: "password-a-1" }, { name: "B", password: "password-b-1" }]);
     expect(plan.filter((a) => a.type === "claim")).toHaveLength(1);
     expect(plan.filter((a) => a.type === "create")).toHaveLength(1);
+  });
+});
+
+describe("bootstrapProblems", () => {
+  it("says nothing when every entry is usable", () => {
+    expect(bootstrapProblems("Sam:a-long-password,Alex:another-password")).toEqual([]);
+    expect(bootstrapProblems("")).toEqual([]);
+  });
+
+  it("names each dropped entry and why, without ever echoing a password", () => {
+    const problems = bootstrapProblems("Sam:short,Alex:a-long-password,Alex:another-password");
+    expect(problems).toHaveLength(2);
+    expect(problems[0]).toMatch(/entry 1 \("Sam"\).*at least 8/);
+    expect(problems[1]).toMatch(/entry 3 \("Alex"\).*twice/);
+    expect(problems.join()).not.toMatch(/a-long-password|another-password/);
+  });
+
+  it("explains a comma inside a password without showing its tail", () => {
+    const problems = bootstrapProblems("Sam:pass,word-secret-tail,Alex:a-long-password");
+    expect(problems.some((p) => /no ":"/.test(p))).toBe(true);
+    expect(problems.join()).not.toMatch(/secret-tail/);
+  });
+
+  it("reports bad JSON", () => {
+    expect(bootstrapProblems("[{oops")[0]).toMatch(/JSON/);
   });
 });

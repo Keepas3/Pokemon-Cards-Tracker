@@ -97,8 +97,9 @@ in; changing `SESSION_SECRET` signs everyone out.
 | You see | Likely cause |
 |---|---|
 | Health check fails on the first deploy | The volume or variables aren't set yet; check the deploy logs for the real error. |
-| "The server isn't configured for sign-in (SESSION_SECRET)" | `SESSION_SECRET` is missing or under 32 characters. |
-| "No profiles are set up yet" on the sign-in page | `BOOTSTRAP_PROFILES` is missing or has no valid entries (a name, and a password of 8+ characters). |
+| Logs repeat "The datasource.url property is required in your Prisma config file" (or "DATABASE_URL is not set") | The `DATABASE_URL` variable isn't reaching the service. Add it under **this service's Variables** (not only a shared or project-level list) as `file:/data/app.db`, with a volume mounted at `/data`, then click **Deploy** to apply the staged change. The "injected env (0) from .env" line is normal: the container has no `.env` file. |
+| "Sign-in isn't set up on this site yet" | `SESSION_SECRET` is missing or under 32 characters. |
+| "No profiles have been set up on this site yet" on the sign-in page | `BOOTSTRAP_PROFILES` is missing or has no valid entries (a name, and a password of 8+ characters). |
 | `403 Blocked: unexpected Host` | The site's address isn't in `ALLOWED_HOSTS`. |
 | `403 Blocked: cross-site request` | Something other than the site itself sent the request (a bookmarklet, another origin). Use the site normally. |
 | Prices are empty | `TCGAPI_DEV_API_KEY` missing, or the daily 100-request limit was used up; it resets at midnight UTC. |

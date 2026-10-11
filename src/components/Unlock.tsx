@@ -16,19 +16,35 @@ export default function Unlock({ next }: { next: string }) {
   const [chosen, setChosen] = useState<string | null>(null);
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     fetch("/api/auth/profiles")
-      .then((r) => r.json())
+      .then(async (r) => {
+        const d = (await r.json().catch(() => ({}))) as { profiles?: PublicProfile[]; error?: string };
+        if (!r.ok || !Array.isArray(d.profiles)) {
+          // Say what actually went wrong instead of claiming there are no profiles.
+          throw new Error(
+            r.status === 403
+              ? "This site doesn't recognise the address you're using. If you run it, add this address to ALLOWED_HOSTS and redeploy."
+              : (d.error ?? "Couldn't load the profiles."),
+          );
+        }
+        return d as { profiles: PublicProfile[] };
+      })
       .then((d: { profiles?: PublicProfile[] }) => {
         if (cancelled) return;
         const usable = (d.profiles ?? []).filter((p) => p.hasPassword);
         setProfiles(usable);
         setChosen((current) => current ?? usable[0]?.id ?? null);
       })
-      .catch(() => !cancelled && setError("Couldn't reach the server."));
+      .catch((err: Error) => {
+        if (cancelled) return;
+        setProfiles([]);
+        setLoadError(err instanceof TypeError ? "Couldn't reach the server." : err.message);
+      });
     return () => {
       cancelled = true;
     };
@@ -75,7 +91,7 @@ export default function Unlock({ next }: { next: string }) {
           <p className="text-sm text-muted">Loading…</p>
         ) : profiles.length === 0 ? (
           <p className="rounded-lg border border-warn/30 bg-warn-soft px-3 py-2 text-xs text-warn">
-            No profiles have been set up on this site yet.
+            {loadError ?? "No profiles have been set up on this site yet."}
           </p>
         ) : (
           <>
