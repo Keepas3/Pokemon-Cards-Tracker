@@ -1,4 +1,4 @@
-// Pokemon Sealed Product Restock Tracker — schema
+// Binder — schema
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
@@ -368,6 +368,7 @@ model SmartWatchMatch {
   @@unique([smartWatchId, itemExternalId, printing])
 }
 
+// LEGACY (unused): JustTCG was removed, so nothing reads or writes this any more.
 // One row per set per day from JustTCG's set list: total value and its recent
 // change. Feeds the digest's "biggest movers", and quietly accumulates a
 // price history of our own.

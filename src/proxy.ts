@@ -53,7 +53,7 @@ export function proxy(request: NextRequest) {
   } catch {
     // No usable SESSION_SECRET: fail closed rather than let anything through.
     return isApi
-      ? NextResponse.json({ error: "The server isn't configured for sign-in (SESSION_SECRET)." }, { status: 503 })
+      ? NextResponse.json({ error: "Sign-in isn't set up on this site yet." }, { status: 503 })
       : new NextResponse("The server isn't configured for sign-in (SESSION_SECRET).", { status: 503 });
   }
 

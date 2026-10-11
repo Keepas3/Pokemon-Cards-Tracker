@@ -96,7 +96,7 @@ export default function Watchlist({ initialTab }: { initialTab: WatchlistTab }) 
             <h2 className="text-sm font-semibold">Add a card</h2>
             <CardSearchBox onAdded={refresh} />
             <p className="text-xs text-subtle">
-              Searches tcgapi.dev. You can also watch a card straight from any set page on{" "}
+              You can also watch a card straight from any set page on{" "}
               <Link href="/browse" className="link">
                 Browse
               </Link>

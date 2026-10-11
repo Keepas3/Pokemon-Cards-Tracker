@@ -205,7 +205,7 @@ export default function SetsBrowser() {
       ) : visible.length === 0 ? (
         <EmptyState title={data && data.sets.length > 0 ? "No sets match that search." : "No sets loaded yet."}>
           {data && data.sets.length > 0 ? null : (
-            <>Add a TCGAPI_DEV_API_KEY (see Settings), then click Refresh list.</>
+            <>The set list couldn&apos;t be loaded. Try Refresh list in a moment.</>
           )}
         </EmptyState>
       ) : (

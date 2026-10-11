@@ -321,13 +321,7 @@ export default function Collection() {
           ))
         )}
 
-        <p className="text-xs text-subtle">
-          Set lists, logos and card lists come from{" "}
-          <a href="https://tcgdex.dev" target="_blank" rel="noreferrer" className="link">
-            TCGdex
-          </a>
-          ; prices from tcgapi.dev (up to 12 hours old).
-        </p>
+        <p className="text-xs text-subtle">Prices are up to 12 hours old.</p>
       </div>
     </>
   );

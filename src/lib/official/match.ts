@@ -4,7 +4,7 @@
 // is worse than none (it would show another set's card list), so every rule here
 // is conservative and one-to-one.
 
-import { normalizeSetName } from "@/lib/openOrHold/matching";
+import { normalizeSetName } from "./setNames";
 import { SET_ALIASES } from "./aliases";
 import type { OfficialSetInfo } from "./types";
 

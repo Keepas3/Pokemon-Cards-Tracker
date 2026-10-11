@@ -313,7 +313,7 @@ export default function Settings() {
 
             <Field
               label="Quiet hours (optional)"
-              help="Prices are still checked during quiet hours — you just won't get a Discord ping. Leave blank to always notify."
+              help="Prices are still checked during quiet hours — you just won't get a Discord ping. Leave blank to always notify. Hours are in the server's time zone."
             >
               <div className="flex items-center gap-2">
                 <input
@@ -365,7 +365,7 @@ export default function Settings() {
                   </option>
                 ))}
               </select>
-              <span className="text-subtle">(this computer&apos;s time)</span>
+              <span className="text-subtle">(the server&apos;s time zone)</span>
             </div>
             <p className="text-xs text-subtle">
               A day with none of that sends nothing. It ignores quiet hours (you chose the time) but needs notifications on
@@ -394,29 +394,6 @@ export default function Settings() {
 
         <Section title="Your data" description="A backup you can keep, and a way to bring one back.">
           <DataBackup />
-        </Section>
-
-        <Section title="API keys" description="Set these in the project's .env file, then restart the app.">
-          <div className="space-y-4 text-sm text-muted">
-            <div>
-              <p className="font-medium text-fg">Card prices and set data</p>
-              <p className="mt-1">
-                Set prices and card search use one free key, set as <code className="text-fg">TCGAPI_DEV_API_KEY</code>. Get it at{" "}
-                <a href="https://tcgapi.dev/" target="_blank" rel="noreferrer" className="link">
-                  tcgapi.dev
-                </a>
-                . The free tier allows about 100 requests a day, so set pages reuse saved prices and the app fills in set prices in the
-                background, one set at a time, using only requests the rest of the day doesn&apos;t need. Sets with an alert are refreshed first.
-              </p>
-              <p className="mt-2">
-                Card lists, set logos and card art come from{" "}
-                <a href="https://tcgdex.dev/" target="_blank" rel="noreferrer" className="link">
-                  TCGdex
-                </a>{" "}
-                and need no key.
-              </p>
-            </div>
-          </div>
         </Section>
 
         <Section title="About">

@@ -20,7 +20,7 @@ const nextConfig: NextConfig = {
           { key: "X-Content-Type-Options", value: "nosniff" },
           // A private site: keep it out of search results too.
           { key: "X-Robots-Tag", value: "noindex, nofollow" },
-          // Retailer and TCGplayer links open without telling them which local address you came from.
+          // TCGplayer links open without telling them which local address you came from.
           { key: "Referrer-Policy", value: "no-referrer" },
           { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=(), usb=()" },
         ],

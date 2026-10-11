@@ -48,8 +48,12 @@ export const authLimiters = (g.__authLimiters ??= {
   perProfile: createRateLimiter({ max: 20, windowMs: WINDOW_MS }),
 });
 
-/** The caller's address from the forwarding headers a host sets, or "unknown". */
+/**
+ * The caller's address from the forwarding headers a host sets, or "unknown". With several addresses in
+ * X-Forwarded-For the *last* is the one the host's own proxy added; earlier ones are whatever the visitor sent,
+ * so trusting the first would let a guesser dodge the per-address limit by inventing addresses.
+ */
 export function clientAddress(headers: Pick<Headers, "get">): string {
-  const forwarded = headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+  const forwarded = headers.get("x-forwarded-for")?.split(",").map((a) => a.trim()).filter(Boolean).at(-1);
   return forwarded || headers.get("x-real-ip")?.trim() || "unknown";
 }

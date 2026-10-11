@@ -9,7 +9,6 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
-    "db:seed": "tsx prisma/seed.ts",
     "profile:set": "tsx scripts/profile.ts",
     "db:studio": "prisma studio"
   },

@@ -62,7 +62,7 @@ describe("tcgApiDevChecker", () => {
     delete process.env.TCGAPI_DEV_API_KEY;
     const result = await tcgApiDevChecker.search("charizard");
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toMatch(/TCGAPI_DEV_API_KEY/);
+    if (!result.ok) expect(result.error).toMatch(/isn.t set up/);
   });
 
   it("surfaces the API's own error message on a 401", async () => {

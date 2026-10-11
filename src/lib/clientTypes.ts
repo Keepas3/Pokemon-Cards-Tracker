@@ -175,16 +175,6 @@ export interface SmartWatchDTO {
   setItemsFetchedAt: string | null;
 }
 
-export interface SmartWatchInput {
-  setSlug: string;
-  name?: string | null;
-  kind?: SetItemKind | null;
-  rarity?: string | null;
-  query?: string | null;
-  onlyMissing?: boolean;
-  maxPriceCents: number;
-}
-
 export interface TodayPayload {
   digest: Digest;
   /** The best deals right now on cards the person is missing (their sets and followed Pokémon). */

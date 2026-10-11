@@ -41,6 +41,6 @@ export async function POST(req: NextRequest) {
     return setSession(res, req, unlockProfile(sessionOf(req), profile.id));
   } catch {
     // No usable SESSION_SECRET (see lib/auth/session.ts): say so instead of a bare 500.
-    return NextResponse.json({ error: "The server isn't configured for sign-in yet (SESSION_SECRET)." }, { status: 503 });
+    return NextResponse.json({ error: "Sign-in isn't set up on this site yet." }, { status: 503 });
   }
 }

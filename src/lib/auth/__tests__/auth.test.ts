@@ -148,7 +148,9 @@ describe("rate limiter", () => {
 describe("clientAddress", () => {
   const headers = (h: Record<string, string>) => ({ get: (k: string) => h[k.toLowerCase()] ?? null });
   it("takes the first forwarded address, then x-real-ip, else unknown", () => {
-    expect(clientAddress(headers({ "x-forwarded-for": "1.2.3.4, 10.0.0.1" }))).toBe("1.2.3.4");
+    expect(clientAddress(headers({ "x-forwarded-for": "1.2.3.4" }))).toBe("1.2.3.4");
+    // An address the visitor invented, then the one the host's proxy added: only the latter counts.
+    expect(clientAddress(headers({ "x-forwarded-for": "6.6.6.6, 1.2.3.4" }))).toBe("1.2.3.4");
     expect(clientAddress(headers({ "x-real-ip": "5.6.7.8" }))).toBe("5.6.7.8");
     expect(clientAddress(headers({}))).toBe("unknown");
   });

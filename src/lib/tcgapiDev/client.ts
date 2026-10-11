@@ -52,7 +52,8 @@ export function errorText(error: unknown): string | null {
 export async function tcgApiFetch<T>(path: string): Promise<TcgApiResult<T>> {
   const apiKey = process.env.TCGAPI_DEV_API_KEY;
   if (!apiKey) {
-    return { ok: false, error: "TCGAPI_DEV_API_KEY is not set — get a free key at tcgapi.dev" };
+    console.warn("[tcgapi.dev] TCGAPI_DEV_API_KEY is not set, so no prices can be fetched (see the README).");
+    return { ok: false, error: "Price data isn't set up on this site, so prices can't be loaded right now." };
   }
 
   let res: Response;

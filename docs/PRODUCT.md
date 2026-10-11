@@ -12,7 +12,7 @@ different way: it knows *your* collection, so it can say "this is the card you'r
 
 1. **Browse** the sets: every card and sealed product, with prices.
 2. **Collect**: mark what you own, by set or by Pokémon, and watch the completion and the cost to finish.
-3. **Spot deals**: cards you're missing whose lowest listing is far below market.
+3. **Spot deals**: cards you're missing, and packs, tins and boxes, whose lowest listing is below market.
 4. **Decide**: for sealed product, *open or hold* (is it worth more sealed or opened?).
 5. **Get told**: a Discord message when an alert hits, plus one morning digest.
 
@@ -36,12 +36,12 @@ watched cards, alert rules and Discord settings. Prices, sets and card lists are
 
 | Page | What it's for |
 |---|---|
-| **Today** | What happened since yesterday: deals on cards you're missing, new alert matches, moves on watched cards. The same ideas as the morning digest. |
+| **Today** | What happened since yesterday: deals on packs, tins and boxes, deals on cards you're missing, new alert matches, moves on watched cards. The same ideas as the morning digest (which mentions card deals only). |
 | **Browse** | Every Pokémon set with its cards and sealed products, filters, a price range per set, and an **Open or hold?** panel on every sealed product. Each card has a counter for the copies you own. |
 | **Watchlist** | Cards you want to hear about when their price drops, and set-wide smart alerts. |
-| **Collection → Sets** | Every set by series with its logo and your progress. Open one for its full card list as an image grid; tap what you own. |
+| **Collection → Sets** | Every set by series with its logo and your progress. Open one for its full card list as an image grid; tap a card to see it larger, press "I own this" to mark it. Drag a tile's grip to rearrange the sets in a series (saved per profile); filter by started and finished. |
 | **Collection → Pokémon** | Every Pokémon in Pokédex order. Open one (Charizard is #6) to see every card ever printed of it, across all sets, and tick off which you own. |
-| **Collection → Deals** | Cards you're missing that are listed well under market. |
+| **Collection → Deals** | Cards you're missing that are listed well under market, or (second view) packs, tins and boxes under market, cheapest first. |
 | **Settings** | Your Discord webhook, quiet hours and morning digest; password; backup and restore; theme. |
 
 The sidebar's profile menu switches between the two collections. You stay signed in on a device for about three
@@ -56,8 +56,8 @@ included (Perfect Order is 124, not 88).
 - **Cost to finish** is the sum of each missing card's *cheapest* printing at market price. Cards with no price yet are
   counted separately instead of being treated as free.
 - **Worth** is each owned card at its cheapest market price.
-- A set's **Products** tab holds everything that isn't a card (booster packs, boxes, collection boxes, code cards).
-  They have prices but can't be owned and never count toward completion.
+- A set's **Products** tab holds everything that isn't a card (booster packs, boxes, collection boxes). They have
+  prices but can't be owned and never count toward completion. Online-game code cards are not saved at all.
 - **Log a pull** is the quick way after opening packs: type a card number ("25", "025/088") or part of a name and press
   Enter. If an entry could mean several cards it lists them to pick from, and the last add has an Undo.
 
@@ -82,6 +82,12 @@ $2. The list looks at the sets you've started and the Pokémon you follow (or "E
 - **I got it** marks the card owned and takes it off the list.
 
 The list is only as fresh as the saved prices. The background job refreshes the sets people are collecting first.
+
+**Packs, tins and boxes.** The Deals page has a second view for sealed products, and Today shows the best few, cheapest
+first. Nothing is "missing" there, so every sealed product in the sets you've started or the Pokémon you follow counts
+(or everything, on request). The bar is lower than for cards, because a tin at 10% under market is still worth a look:
+at least 10% and $1.50 under the market price. Cases and displays (a shop's stock, not a pickup) are left out, and the
+same "unusually low" flag applies above 70%. They aren't in the Discord digest.
 
 ## Smart alerts
 
@@ -155,16 +161,17 @@ Everything is designed around tcgapi.dev's free tier (about 100 requests a day, 
 | Source | Used for | Limit |
 |---|---|---|
 | tcgapi.dev | Set lists, set contents, market and lowest-listing prices | ~100 requests/day on the free tier; free tier is for non-commercial use ([API-TERMS.md](API-TERMS.md)) |
-| TCGdex | Series, logos, release dates, card lists, each Pokémon's cards, card art | No key; "be considerate". Card art belongs to The Pokémon Company and is hotlinked, not copied |
+| TCGdex | Series, logos, release dates, card lists, each Pokémon's cards, card art | No key; "be considerate". Card art belongs to The Pokémon Company and is hotlinked, not copied; set logos and icons are saved once in the site's own database |
 | PokeAPI | The list of Pokémon names, fetched once and saved in the repo | One-off; regenerate when a new generation appears |
 | TCGplayer pull-rate studies | Open-or-hold hit rates | Published articles, copied into the code with citations; new sets need adding by hand |
 | Discord webhooks | Alerts and the digest | One webhook per profile |
 
 ## What's built vs. planned
 
-Built: profiles with passwords, collection by set and by Pokémon, deals on missing cards, set browsing with price
-ranges, background price fill, watched cards and smart alerts with Discord, the morning digest, Open or hold, backup and
-restore, nightly snapshots, Railway/GitHub deployment files.
+Built: profiles with passwords, collection by set and by Pokémon, deals on missing cards and on packs, tins and boxes,
+set browsing with price ranges, background price fill, watched cards and smart alerts with Discord, the morning digest,
+Open or hold, backup and restore (JSON and a spreadsheet), nightly snapshots, rearranging sets, saved set logos,
+Railway/GitHub deployment files.
 
 Not started: completion by printing/finish (a "master set" mode); condition and grading; a wishlist with target prices
 for specific missing cards (watched cards cover the alert part); selling duplicates and trade lists.

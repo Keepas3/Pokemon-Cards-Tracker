@@ -219,13 +219,7 @@ export default function PokemonGallery() {
           </>
         )}
 
-        <p className="text-xs text-subtle">
-          Card lists come from{" "}
-          <a href="https://tcgdex.dev" target="_blank" rel="noreferrer" className="link">
-            TCGdex
-          </a>
-          ; prices from tcgapi.dev (up to 12 hours old). A card counts in any printing, and in any set we can track.
-        </p>
+        <p className="text-xs text-subtle">Prices are up to 12 hours old. A card counts in any printing, and in any set we can track.</p>
       </div>
     </>
   );

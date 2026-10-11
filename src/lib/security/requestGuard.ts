@@ -1,5 +1,5 @@
-// Decides whether a request to /api may proceed. The app has no login — it's meant to run
-// on your own machine — so the protection is *where a request comes from*:
+// Decides whether a request to /api may proceed. Sign-in (see lib/auth/) decides *who* is asking;
+// this decides *where a request comes from*, which sign-in alone doesn't cover:
 //
 //   • the Host must be this machine (localhost / 127.0.0.1 / ::1) or one you listed in
 //     ALLOWED_HOSTS. That stops DNS-rebinding, where a website points its own name at

@@ -75,8 +75,7 @@ export default function Unlock({ next }: { next: string }) {
           <p className="text-sm text-muted">Loading…</p>
         ) : profiles.length === 0 ? (
           <p className="rounded-lg border border-warn/30 bg-warn-soft px-3 py-2 text-xs text-warn">
-            No profiles are set up yet. Set <code>BOOTSTRAP_PROFILES</code> where the app runs (see the README), or run{" "}
-            <code>npm run profile:set</code>, then reload.
+            No profiles have been set up on this site yet.
           </p>
         ) : (
           <>

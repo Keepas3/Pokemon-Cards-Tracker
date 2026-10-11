@@ -48,6 +48,7 @@ the type check, lint, tests and a build on every push and pull request.
 | `SESSION_SECRET` | a long random string: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` |
 | `BOOTSTRAP_PROFILES` | `Sam:their-password,Alex:their-password` (use your own names and passwords; passwords can't contain commas, or use the JSON form shown in `.env.example`) |
 | `ALLOWED_HOSTS` | the site's address without `https://`, e.g. `my-binder.up.railway.app` (add your own domain too if you attach one) |
+| `TZ` | your time zone, e.g. `America/New_York`. Without it the server uses UTC, and the morning digest hour and quiet hours (set in Settings) would be read in UTC. If you two are in different time zones, pick hours in the server's zone |
 
    Don't set `PORT` (Railway does) or `DISABLE_SCHEDULER`.
 5. Under **Settings → Networking**, **generate a domain**. Put that exact host in `ALLOWED_HOSTS` and redeploy. If you

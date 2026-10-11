@@ -142,7 +142,7 @@ export default function CollectionSet({ slug }: { slug: string }) {
             <div className="mt-2 flex flex-wrap items-center gap-1.5">
               {set.seriesName && <span className="chip">{set.seriesName}</span>}
               <span className="chip">{set.releaseDate ? `Released ${formatDate(set.releaseDate)}` : "Release date unknown"}</span>
-              {!set.official && cards.length > 0 && <span className="chip chip-warn">Card list from tcgapi.dev</span>}
+              {!set.official && cards.length > 0 && <span className="chip chip-warn">Card list may be incomplete</span>}
             </div>
           </div>
           <Link href={`/browse/sets/${set.slug}`} className="btn">
@@ -154,7 +154,7 @@ export default function CollectionSet({ slug }: { slug: string }) {
       {data.error && (
         <p className="rounded-lg border border-warn/30 bg-warn-soft px-3 py-2 text-xs text-warn">
           {data.error}
-          {!set.official && " Showing the cards tcgapi.dev lists; the full official list isn't available for this set."}
+          {!set.official && " Showing the cards that have prices; the full card list isn't available for this set."}
         </p>
       )}
 
@@ -172,7 +172,7 @@ export default function CollectionSet({ slug }: { slug: string }) {
             ? "Its cards will appear here once the catalog lists them."
             : products.length > 0
               ? "This looks like a products-only release, or its cards aren't listed yet. Its products are under the Products tab."
-              : "Open the set in Browse to load its prices from tcgapi.dev, then come back."}
+              : "Open the set in Browse to load its cards, then come back."}
         </EmptyState>
       )}
 
@@ -257,7 +257,7 @@ export default function CollectionSet({ slug }: { slug: string }) {
         )
       ) : products.length === 0 ? (
         <EmptyState title="No sealed products or other items listed for this set.">
-          They come from tcgapi.dev when the set&apos;s prices are loaded in Browse.
+          They show up once the set&apos;s prices are loaded in Browse.
         </EmptyState>
       ) : (
         <div className="space-y-2">

@@ -166,6 +166,6 @@ describe("fetching (mocked HTTP)", () => {
     delete process.env.TCGAPI_DEV_API_KEY;
     const result = await fetchAllSets();
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toMatch(/TCGAPI_DEV_API_KEY/);
+    if (!result.ok) expect(result.error).toMatch(/isn.t set up/);
   });
 });

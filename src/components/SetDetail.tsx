@@ -133,7 +133,7 @@ export default function SetDetail({ slug }: { slug: string }) {
         <BackLink />
         {loading ? (
           <p className="text-sm text-muted">
-            Loading set… the first time a set is opened it&apos;s fetched from tcgapi.dev, which can take a few seconds.
+            Loading set… the first time a set is opened it can take a few seconds.
           </p>
         ) : (
           <p className="text-sm text-warn">{error ?? "Couldn't load this set."}</p>
@@ -194,7 +194,7 @@ export default function SetDetail({ slug }: { slug: string }) {
           <SetCompletion summary={summary} />
           <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3 text-xs">
             <span className="text-subtle">
-              {summary.source === "official" ? "Counted against the set's full card list." : "Counted against the cards tcgapi.dev lists."}
+              {summary.source === "official" ? "Counted against the set's full card list." : "Counted against the cards that have prices."}
             </span>
             <Link href={`/collection/${set.slug}`} className="link inline-flex items-center gap-1">
               Open in Collection <Icon name="arrow" className="h-3.5 w-3.5" />

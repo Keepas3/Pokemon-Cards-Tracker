@@ -21,7 +21,7 @@ left is:
 | Source | Used for | The two-person hosted setup |
 |---|---|---|
 | **tcgapi.dev** | Prices and set contents | The one key. Free tier is for personal, non-commercial projects, and its Licensing page lists a **free, ad-free hobby project** as fine, so a private site for two friends is a judgement call that leans OK; the data is never offered as an API, feed or download to anyone, and the key stays on the server. Free tier allows caching "during an active subscription"; unclear on free. No ads, no affiliate links, no charging, or it needs Pro. |
-| **TCGdex** | Card lists, logos, per-Pokémon cards, card art | MIT code/database, no API terms found, "be considerate". Everything is cached; card art is **hotlinked**, never copied (it's The Pokémon Company's). |
+| **TCGdex** | Card lists, logos, per-Pokémon cards, card art | MIT code/database, no API terms found, "be considerate". Everything is cached; card art is **hotlinked**, never copied (it's The Pokémon Company's). Set logos and tcgapi.dev's set icons (~380 small files) *are* saved in the site's private database; see the note below. |
 | **PokeAPI** | The Pokémon names list | Fetched once into the repo (facts, not artwork). |
 | **Discord** | Alerts and the digest | One webhook per profile, stored in the database, never in the repo and never sent back to the browser. |
 | **Pokémon names, art, logos** | Display | Personal-scale fan use is the realistic reading; **don't make the site public, add ads, or sell anything.** The Settings page and sign-in page carry an "unofficial fan project" notice. |
@@ -29,7 +29,7 @@ left is:
 
 **What would change the picture:** making the site public, adding ads or affiliate links (tcgapi.dev then wants its Pro plan
 and TCGplayer wants its own affiliate approval), letting visitors bring their own keys, or publishing the database, price
-snapshots or card images. Any of those means re-reading the sections below first.
+snapshots or card images. Any of those means re-reading the sections below first. (The database now also holds the saved set logos and icons, which is one more reason it must never be published.)
 
 ## At a glance
 
@@ -71,6 +71,12 @@ Pages: tcgdex.dev home/FAQ/assets/markets-prices, GitHub `tcgdex/cards-database`
 - No attribution is required for API use (the MIT notice applies if you redistribute copies). Crediting them is good manners and the README does.
 - Images are served from `assets.tcgdex.net`; the docs only describe the URL scheme. The website's terms say card information and images are licensed by The Pokémon Company, so the artwork isn't TCGdex's to grant. **Hotlinking is safer than re-hosting** (what the app does); don't commit images.
 - Prices embedded in TCGdex card responses come from Cardmarket/TCGplayer; the app doesn't use them.
+- **Saved set logos and icons.** To keep the pages working if a host drops a file, the app saves each set logo (TCGdex) and
+  set icon (tcgapi.dev / TCGplayer's CDN) into its own database the first time it's needed, and serves it only to signed-in
+  people, never publicly. Pokémon's terms bar downloading content "to a database", so this is a small, personal-scale
+  judgement call (about 380 files of a few KB, the same images the site would otherwise load directly). Card art is not
+  copied. To undo it, delete the rows of the `StoredImage` table and remove `imageTick` from `src/lib/scheduler.ts`; the
+  pages then load the original addresses again.
 
 ## Best Buy Developer API
 Pages: developer.bestbuy.com legal terms ("last updated Feb 23, 2021"), API documentation.
@@ -114,7 +120,7 @@ Pages: Terms of Service (Sept 27, 2023), API Terms (June 8, 2022), Partner Guide
 
 ## What to do if you want to share it
 Safest path, from the research:
-1. Publish the **code only**: no `.env`, no webhook, no database or price snapshots, no images or logos. (`.env` and `prisma/*.db` are already git-ignored.)
+1. Publish the **code only**: no `.env`, no webhook, no database or price snapshots, no images or logos. (`.env` and every `*.db` file, including snapshots and the saved logos inside them, are already git-ignored.)
 2. Keep the Pokémon Center and Target adapters **out of anything public** (off by default or removed); they're the part that conflicts with their owners' terms.
 3. Don't host it publicly or monetize without the right plans: JustTCG paid, tcgapi.dev Pro for anything earning money, Best Buy attribution + logo, and written permission from Pokémon Center / Target if their data stays in.
 4. Add a plain "unofficial fan project, not affiliated with Nintendo, The Pokémon Company, TCGplayer, Best Buy…" notice.
