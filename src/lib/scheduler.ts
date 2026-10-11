@@ -4,6 +4,7 @@ import { fillNextSetPrices } from "@/lib/sets/setsService";
 import { FILL_INTERVAL_MS } from "@/lib/sets/freshness";
 import { digestTick } from "@/lib/digest/send";
 import { takeSnapshot } from "@/lib/backup/snapshot";
+import { warmImages } from "@/lib/images/store";
 
 // Card price checks cost one request PER card price source, and tcgapi.dev's
 // free tier caps out around 100 requests/day — a handful of watched cards
@@ -70,6 +71,26 @@ export async function setFillTick() {
   }
 }
 
+let imagesRunning = false;
+let lastImagesAt = 0;
+const IMAGES_INTERVAL_MS = 30 * 60 * 1000;
+
+/** Keeps a saved copy of every set logo and icon: a few dozen per run until all are saved, then almost nothing to do. */
+async function imageTick() {
+  if (imagesRunning) return;
+  if (Date.now() - lastImagesAt < IMAGES_INTERVAL_MS) return;
+  imagesRunning = true;
+  lastImagesAt = Date.now();
+  try {
+    const { saved, remaining } = await warmImages();
+    if (saved > 0) console.log(`[scheduler] saved ${saved} set logo/icon image(s)${remaining > 0 ? `, ${remaining} to go` : ""}`);
+  } catch (err) {
+    console.error("[scheduler] saving set images failed:", err);
+  } finally {
+    imagesRunning = false;
+  }
+}
+
 let snapshotRunning = false;
 
 /** Once a day, a copy of the database (see lib/backup/snapshot.ts). Cheap to check every minute. */
@@ -115,6 +136,7 @@ export function startScheduler() {
     void setFillTick();
     void morningDigestTick();
     void snapshotTick();
+    void imageTick();
   });
   // Run shortly after startup so the app has data without waiting for the
   // first interval to elapse. Each is staggered so a fresh restart doesn't
@@ -122,6 +144,7 @@ export function startScheduler() {
   setTimeout(() => void cardPriceTick(), 35_000);
   setTimeout(() => void setFillTick(), 50_000);
   setTimeout(() => void snapshotTick(), 65_000);
+  setTimeout(() => void imageTick(), 80_000);
   console.log(
     "[scheduler] started — checking watched card prices, filling set prices and sending the morning digest on an interval",
   );

@@ -191,6 +191,9 @@ export interface TodayPayload {
   deals: DealDTO[];
   /** How many deals there are in all (the list above is cut short). */
   dealsFound: number;
+  /** The best deals on sealed products (booster packs, tins, boxes) in the person's sets and followed Pokémon. */
+  productDeals: DealDTO[];
+  productDealsFound: number;
   smartWatches: SmartWatchDTO[];
   digestEnabled: boolean;
   digestHour: number;

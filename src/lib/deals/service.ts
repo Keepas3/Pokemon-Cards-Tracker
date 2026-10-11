@@ -5,9 +5,9 @@
 import { prisma } from "@/lib/prisma";
 import { cardKey } from "@/lib/collection/numbers";
 import { loadPokemon } from "@/lib/pokedex/service";
-import { classifyItem } from "@/lib/sets/classify";
+import { classifyItem, isBulkLot } from "@/lib/sets/classify";
 import { tcgplayerUrl } from "@/lib/sets/setsView";
-import { DEFAULT_THRESHOLDS, bestPerCard, dealOf, isNewDeal, rankDeals } from "./compute";
+import { DEFAULT_THRESHOLDS, PRODUCT_THRESHOLDS, bestPerCard, dealOf, isNewDeal, rankDeals } from "./compute";
 import type { DealCandidate, DealThresholds } from "./compute";
 import type { DealDTO, DealScope, DealsPayload } from "./types";
 
@@ -16,6 +16,8 @@ const DEFAULT_LIMIT = 60;
 export const DIGEST_DEAL_LIMIT = 5;
 
 interface LoadOptions {
+  /** Single cards you're missing (default), or sealed products — booster packs, tins, boxes. */
+  kind?: "cards" | "products";
   scope?: DealScope;
   thresholds?: DealThresholds;
   limit?: number;
@@ -23,11 +25,13 @@ interface LoadOptions {
 
 /**
  * Deals for one person. `mine` looks at the sets they've started and the Pokémon they follow;
- * `all` looks at every set that has saved prices.
+ * `all` looks at every set that has saved prices. With `kind: "products"` the deals are sealed
+ * products (nothing to be "missing" there, so every product in those sets counts) and the bar is lower.
  */
 export async function loadDeals(profileId: string, opts: LoadOptions = {}): Promise<DealsPayload> {
   const scope = opts.scope ?? "mine";
-  const thresholds = opts.thresholds ?? DEFAULT_THRESHOLDS;
+  const products = opts.kind === "products";
+  const thresholds = opts.thresholds ?? (products ? PRODUCT_THRESHOLDS : DEFAULT_THRESHOLDS);
   const limit = Math.min(Math.max(opts.limit ?? DEFAULT_LIMIT, 1), 500);
 
   const ownedRows = await prisma.ownedCard.findMany({ where: { profileId }, select: { setId: true, numberKey: true } });
@@ -56,33 +60,40 @@ export async function loadDeals(profileId: string, opts: LoadOptions = {}): Prom
         found: 0,
         setsConsidered: 0,
         pricesAsOf: null,
-        note: "Mark a few cards as owned, or follow a Pokémon, and deals on the cards you're missing will show up here. Or look at everything.",
+        note: products
+          ? "Mark a few cards as owned, or follow a Pokémon, and deals on that set's booster packs, tins and boxes will show up here. Or look at everything."
+          : "Mark a few cards as owned, or follow a Pokémon, and deals on the cards you're missing will show up here. Or look at everything.",
       };
     }
   }
 
   const rows = await prisma.setItem.findMany({
     where: {
-      kind: "CARD",
+      // Products: tcgapi.dev's sealed rows, plus unnumbered "cards" that are really boxes (classified below).
+      ...(products ? { OR: [{ kind: "SEALED" }, { kind: "CARD", number: null }] } : { kind: "CARD" }),
       marketPriceCents: { gt: 0 },
       lowPriceCents: { gt: 0 },
       ...(scope === "mine" ? { setId: { in: [...wantedSetIds] } } : {}),
     },
-    select: { setId: true, name: true, number: true, rarity: true, kind: true, imageUrl: true, tcgplayerId: true, marketPriceCents: true, lowPriceCents: true, priceUpdatedAt: true },
+    select: { externalId: true, setId: true, name: true, number: true, rarity: true, kind: true, imageUrl: true, tcgplayerId: true, marketPriceCents: true, lowPriceCents: true, priceUpdatedAt: true },
   });
 
   const setsConsidered = new Set<number>();
   const candidates: DealCandidate[] = [];
   for (const r of rows) {
-    if (classifyItem(r) !== "card") continue;
-    const key = cardKey(r.number);
+    if (classifyItem(r) !== (products ? "sealed" : "card")) continue;
+    if (products && isBulkLot(r.name)) continue; // cases and displays are shop stock
+    const key = products ? `p${r.externalId}` : cardKey(r.number);
     if (key == null) continue;
     const trackKey = `${r.setId}|${key}`;
-    if (ownedKeys.has(trackKey)) continue; // you have it
-    if (scope === "mine" && !ownedInSet.has(r.setId) && !followedKeys.has(trackKey)) continue;
+    if (!products) {
+      if (ownedKeys.has(trackKey)) continue; // you have it
+      if (scope === "mine" && !ownedInSet.has(r.setId) && !followedKeys.has(trackKey)) continue;
+    }
     setsConsidered.add(r.setId);
     candidates.push({
       setId: r.setId,
+      kind: products ? "product" : "card",
       key,
       name: r.name,
       number: r.number,

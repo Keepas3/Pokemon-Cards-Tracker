@@ -2,6 +2,7 @@ import { SetItemKind } from "@/generated/prisma/client";
 import { tcgApiFetch } from "@/lib/tcgapiDev/client";
 import { toCents } from "@/lib/cardPricing/types";
 import { MAX_SET_ROWS } from "./setsView";
+import { isCodeCard } from "./classify";
 
 // Set/collection data from tcgapi.dev (TCGplayer's own groups). Shapes below
 // come from live responses, not guesses: GET /v1/sets and GET /v1/sets/:id/cards
@@ -116,6 +117,8 @@ export function parseItems(rows: RawItem[]): ParsedItem[] {
   for (const row of rows) {
     const kind = kindFromProductType(row.product_type);
     if (typeof row.id !== "number" || !row.name || !kind) continue;
+    // Online-game code cards are never useful to show, so they are left out of what we save.
+    if (isCodeCard({ name: row.name, rarity: row.rarity ?? null })) continue;
     const printing = row.printing ?? "";
     // Pagination can repeat a row across pages; the DB key is (set, id, printing).
     const key = `${row.id}|${printing}`;

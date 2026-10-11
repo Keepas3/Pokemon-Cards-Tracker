@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireProfile } from "@/lib/auth/current";
-import { DEFAULT_THRESHOLDS } from "@/lib/deals/compute";
+import { DEFAULT_THRESHOLDS, PRODUCT_THRESHOLDS } from "@/lib/deals/compute";
 import { loadDeals } from "@/lib/deals/service";
 import type { DealScope } from "@/lib/deals/types";
 
@@ -9,7 +9,7 @@ const clamp = (n: number, lo: number, hi: number) => Math.min(Math.max(n, lo), h
 
 /**
  * Cards the signed-in person is missing that are listed well under their market price.
- * `?scope=mine|all`, `?minPct=25` (percent off), `?minSavings=2` (dollars), `?limit=60`.
+ * `?kind=cards|products` (products = booster packs, tins, boxes), `?scope=mine|all`, `?minPct=25` (percent off), `?minSavings=2` (dollars), `?limit=60`.
  */
 export async function GET(req: NextRequest) {
   const auth = await requireProfile();
@@ -21,15 +21,18 @@ export async function GET(req: NextRequest) {
     const v = Number(q.get(name));
     return q.get(name) != null && q.get(name) !== "" && Number.isFinite(v) ? v : null;
   };
+  const products = q.get("kind") === "products";
+  const defaults = products ? PRODUCT_THRESHOLDS : DEFAULT_THRESHOLDS;
   const minPct = num("minPct");
   const minSavings = num("minSavings");
 
   const payload = await loadDeals(auth.profile.id, {
+    kind: products ? "products" : "cards",
     scope,
     limit: num("limit") ?? undefined,
     thresholds: {
-      minPct: minPct == null ? DEFAULT_THRESHOLDS.minPct : clamp(minPct / 100, 0.05, 0.95),
-      minSavingsCents: minSavings == null ? DEFAULT_THRESHOLDS.minSavingsCents : clamp(Math.round(minSavings * 100), 50, 100_000),
+      minPct: minPct == null ? defaults.minPct : clamp(minPct / 100, 0.05, 0.95),
+      minSavingsCents: minSavings == null ? defaults.minSavingsCents : clamp(Math.round(minSavings * 100), 50, 100_000),
     },
   });
   return NextResponse.json(payload);

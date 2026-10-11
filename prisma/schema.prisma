@@ -171,6 +171,7 @@ model Profile {
   watchedCards    CardWatchlistEntry[]
   followedPokemon FollowedPokemon[]
   dealNotices     DealNotice[]
+  setOrder        SetOrder[]
 }
 
 // --- Card singles (market-price tracking, distinct from sealed-product stock
@@ -481,6 +482,15 @@ model OfficialSet {
   cards OfficialCard[]
 }
 
+// A saved copy of a set logo or icon (a few KB each). Logos never change, so once fetched they are kept,
+// and the site keeps working if the original host ever drops the file. Keyed by the address it came from.
+model StoredImage {
+  sourceUrl   String   @id
+  contentType String
+  data        Bytes
+  fetchedAt   DateTime @default(now())
+}
+
 model OfficialCard {
   id            String      @id @default(cuid())
   officialSetId String
@@ -511,6 +521,17 @@ model DexCache {
 }
 
 // The Pokémon someone has chosen to collect (shown with progress on their Pokémon page).
+// Where one person has dragged a set to on the Collection page. Only sets they have moved are listed;
+// within a series the rest keep their release-date order, ahead of the moved ones (so new sets show first).
+model SetOrder {
+  profileId String
+  profile   Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  setId     Int
+  position  Int
+
+  @@id([profileId, setId])
+}
+
 model FollowedPokemon {
   profileId String
   profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)

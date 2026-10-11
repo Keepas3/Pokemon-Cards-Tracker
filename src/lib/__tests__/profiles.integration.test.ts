@@ -134,6 +134,51 @@ describe("collections are separate", () => {
   });
 });
 
+describe("deals on sealed products", () => {
+  it("lists products priced under market in the sets you collect, with a lower bar than cards", async () => {
+    const { sam, alex } = await twoProfiles();
+    const { loadDeals } = await import("@/lib/deals/service");
+    const { setOwned } = await import("@/lib/collection/service");
+    expect((await setOwned(sam.id, { setId: 9001, number: "001/005", quantity: 1 })).status).toBe("ok"); // Sam collects this set
+    const base = { setId: 9001, rarity: null, printing: "", priceUpdatedAt: new Date() };
+    await prisma.setItem.createMany({
+      data: [
+        { ...base, externalId: 501, name: "Booster Bundle", kind: "SEALED", number: null, marketPriceCents: 3000, lowPriceCents: 2500 }, // 17% off: a deal
+        { ...base, externalId: 502, name: "Mini Tin", kind: "SEALED", number: null, marketPriceCents: 2000, lowPriceCents: 1950 }, // 2.5%: not
+        { ...base, externalId: 505, name: "Booster Box Case", kind: "SEALED", number: null, marketPriceCents: 90000, lowPriceCents: 60000 }, // a case of boxes: not for a collector
+        { ...base, externalId: 503, name: "Collection Box", kind: "CARD", number: null, marketPriceCents: 5000, lowPriceCents: 4000 }, // unnumbered "card" = a box: a deal
+      ],
+    });
+
+    const mine = await loadDeals(sam.id, { kind: "products", scope: "mine" });
+    expect(mine.deals.map((d) => d.name).sort()).toEqual(["Booster Bundle", "Collection Box"]);
+    expect(mine.deals.every((d) => d.kind === "product")).toBe(true);
+    // A 17% saving isn't a card deal (cards need 25%), so cards don't pick these up.
+    expect((await loadDeals(sam.id, { kind: "cards", scope: "all" })).deals.some((d) => d.kind === "product")).toBe(false);
+
+    // "Everything" looks at every set, whoever is asking.
+    expect((await loadDeals(alex.id, { kind: "products", scope: "all" })).deals).toHaveLength(2);
+  });
+});
+
+describe("set order", () => {
+  it("is each person's own, replaces an earlier order, and ignores unknown sets", async () => {
+    const { sam, alex } = await twoProfiles();
+    const { saveSetOrder } = await import("@/lib/collection/service");
+    await prisma.cardSet.create({ data: { id: 9002, name: "Second Set", slug: "second-set", cardCount: 1 } }).catch(() => null);
+
+    expect(await saveSetOrder(sam.id, ["second-set", "test-set", "no-such-set"])).toBe(2);
+    expect(await saveSetOrder(alex.id, ["test-set", "second-set"])).toBe(2);
+    const order = async (id: string) => (await prisma.setOrder.findMany({ where: { profileId: id }, orderBy: { position: "asc" } })).map((o) => o.setId);
+    expect(await order(sam.id)).toEqual([9002, 9001]);
+    expect(await order(alex.id)).toEqual([9001, 9002]);
+
+    await saveSetOrder(sam.id, ["test-set", "second-set"]);
+    expect(await order(sam.id)).toEqual([9001, 9002]);
+    expect(await order(alex.id)).toEqual([9001, 9002]);
+  });
+});
+
 describe("alert rules belong to their owner", () => {
   it("lists, reads and changes only your own rules", async () => {
     const { sam, alex } = await twoProfiles();

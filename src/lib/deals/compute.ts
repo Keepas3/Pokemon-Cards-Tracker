@@ -6,7 +6,9 @@
 
 export interface DealCandidate {
   setId: number;
-  /** cardKey(number): the card's identity within its set. */
+  /** A single card (the default) or a sealed product — a booster pack, tin, box. */
+  kind?: "card" | "product";
+  /** cardKey(number) for a card; "p" + tcgapi.dev's id for a product: its identity within the set. */
   key: string;
   name: string;
   number: string | null;
@@ -36,6 +38,9 @@ export interface DealThresholds {
 }
 
 export const DEFAULT_THRESHOLDS: DealThresholds = { minPct: 0.25, minSavingsCents: 200 };
+
+/** Sealed products only need to be a little under market to be worth a look — a tin at 10% off is still a good day. */
+export const PRODUCT_THRESHOLDS: DealThresholds = { minPct: 0.1, minSavingsCents: 150 };
 
 /** Above this share off, the listing is flagged as unusually low. */
 export const SUSPICIOUS_PCT = 0.7;

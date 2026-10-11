@@ -15,16 +15,19 @@ export async function GET() {
   const { profile } = auth;
 
   const now = new Date();
-  const [digest, smartWatches, deals] = await Promise.all([
+  const [digest, smartWatches, deals, productDeals] = await Promise.all([
     buildDigest(profile.id, new Date(now.getTime() - DAY_MS), now),
     listSmartWatches(profile.id),
     loadDeals(profile.id, { scope: "mine", limit: 6 }),
+    loadDeals(profile.id, { kind: "products", scope: "mine", limit: 6 }),
   ]);
 
   const payload: TodayPayload = {
     digest,
     deals: deals.deals,
     dealsFound: deals.found,
+    productDeals: productDeals.deals,
+    productDealsFound: productDeals.found,
     smartWatches,
     digestEnabled: profile.digestEnabled,
     digestHour: profile.digestHour,

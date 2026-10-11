@@ -21,6 +21,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx prisma generate
+      # Next generates the route types (LayoutProps and friends) that tsc needs; they aren't committed.
+      - run: npx next typegen
       - run: npx tsc --noEmit
       - run: npx eslint .
       - run: npx vitest run

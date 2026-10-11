@@ -14,6 +14,7 @@ import {
   setsMissingPrices,
   sortSets,
 } from "@/lib/sets/setsView";
+import { storedImageSrc } from "@/lib/images/rules";
 import { useApi } from "@/lib/useApi";
 import ApiStatus from "./ApiStatus";
 import EmptyState from "./ui/EmptyState";
@@ -38,7 +39,7 @@ function SetTile({ set }: { set: SetDTO }) {
         {art ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={art}
+            src={storedImageSrc(art)}
             alt=""
             loading="lazy"
             className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
@@ -68,7 +69,7 @@ function SetTile({ set }: { set: SetDTO }) {
             <>
               <p className="num text-xl font-semibold tracking-tight">{formatPriceRange(set.priceRange)}</p>
               <p className="text-xs text-subtle">
-                cheapest to priciest item
+                Price Range
                 {set.itemsFetchedAt ? ` · updated ${timeAgo(set.itemsFetchedAt)}` : ""}
               </p>
             </>

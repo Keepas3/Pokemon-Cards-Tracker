@@ -8,6 +8,8 @@ export interface GallerySetDTO {
   name: string;
   logoUrl: string | null;
   symbolUrl: string | null;
+  /** A picture for sets the card catalog has no logo for (tcgapi.dev's set icon or box art). */
+  artUrl: string | null;
   releaseDate: string | null;
   /** Cards in the set; null when we don't have its card list (unmatched set you haven't started). */
   totalCards: number | null;

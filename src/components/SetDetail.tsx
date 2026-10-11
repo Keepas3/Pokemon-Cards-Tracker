@@ -47,10 +47,11 @@ function BackLink() {
 
 export default function SetDetail({ slug }: { slug: string }) {
   const { data, error, loading, reload, replace } = useApi<SetDetailPayload>(`/api/sets/${encodeURIComponent(slug)}`);
-  const [view, setView] = useState<View>("cards");
+  // Until a tab is chosen: the set's products if it has any, otherwise its cards.
+  const [chosenView, setView] = useState<View | null>(null);
   const [query, setQuery] = useState("");
   const [rarity, setRarity] = useState("");
-  const [sort, setSort] = useState<SetItemSort>("price_desc");
+  const [sort, setSort] = useState<SetItemSort>("price_asc");
   const [limit, setLimit] = useState(PAGE_SIZE);
   const [refreshing, setRefreshing] = useState(false);
   const [missingOnly, setMissingOnly] = useState(false);
@@ -73,6 +74,7 @@ export default function SetDetail({ slug }: { slug: string }) {
   const summary = summaryOverride ?? data?.collection ?? null;
   const cardCount = items.filter((i) => i.group === "card").length;
   const productCount = items.length - cardCount;
+  const view: View = chosenView ?? (productCount > 0 || cardCount === 0 ? "products" : "cards");
   const rarities = useMemo(() => rarityOptions(items.filter((i) => i.group === "card")), [items]);
   const matching = useMemo(() => {
     let list = filterItems(items, { query, rarity, view });

@@ -60,6 +60,16 @@ const PATHS: Record<string, ReactNode> = {
   plus: <path d="M12 5v14M5 12h14" />,
   check: <path d="m5 12 5 5L20 7" />,
   bookmark: <path d="M6 3h12v18l-6-4-6 4z" />,
+  grip: (
+    <>
+      <circle cx="9" cy="6" r="1.2" />
+      <circle cx="15" cy="6" r="1.2" />
+      <circle cx="9" cy="12" r="1.2" />
+      <circle cx="15" cy="12" r="1.2" />
+      <circle cx="9" cy="18" r="1.2" />
+      <circle cx="15" cy="18" r="1.2" />
+    </>
+  ),
   close: <path d="M6 6l12 12M18 6 6 18" />,
   chevron: <path d="m6 9 6 6 6-6" />,
   arrow: <path d="M5 12h14M13 6l6 6-6 6" />,

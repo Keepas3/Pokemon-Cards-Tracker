@@ -4,9 +4,10 @@
 
 import { prisma } from "@/lib/prisma";
 import { classifyItem } from "@/lib/sets/classify";
-import { toItemDTO } from "@/lib/sets/setsService";
+import { ensureSetItems, toItemDTO } from "@/lib/sets/setsService";
 import { ensureOfficialIndex } from "@/lib/official/service";
 import { cardKey } from "./numbers";
+import { MAX_ORDER_SETS, applySetOrder } from "./order";
 import { summarize } from "./progress";
 import { loadSetCollection } from "./setData";
 import type { OwnedInput } from "./input";
@@ -63,11 +64,13 @@ const OTHER = { id: "other", name: "Other sets" };
 export async function loadGallery(profileId: string): Promise<GalleryPayload> {
   const error = await ensureOfficialIndex();
 
-  const [sets, officials, ownedBySet] = await Promise.all([
+  const [sets, officials, ownedBySet, orderRows] = await Promise.all([
     prisma.cardSet.findMany(),
     prisma.officialSet.findMany({ where: { cardSetId: { not: null } } }),
     prisma.ownedCard.groupBy({ by: ["setId"], where: { profileId }, _count: { _all: true }, _sum: { quantity: true } }),
+    prisma.setOrder.findMany({ where: { profileId } }),
   ]);
+  const chosen = new Map(orderRows.map((o) => [o.setId, o.position]));
   const officialBySet = new Map(officials.map((o) => [o.cardSetId as number, o]));
   const owned = new Map(ownedBySet.map((o) => [o.setId, { cards: o._count._all, copies: o._sum.quantity ?? 0 }]));
 
@@ -78,7 +81,7 @@ export async function loadGallery(profileId: string): Promise<GalleryPayload> {
     summaries.set(set.id, (await loadSetCollection(set, { fetchOfficial: false, profileId })).summary);
   }
 
-  const bySeries = new Map<string, { series: GallerySeriesDTO; newest: number; entries: { dto: GallerySetDTO; time: number }[] }>();
+  const bySeries = new Map<string, { series: GallerySeriesDTO; newest: number; entries: { dto: GallerySetDTO; time: number; id: number }[] }>();
   for (const set of sets) {
     const official = officialBySet.get(set.id) ?? null;
     const started = owned.get(set.id);
@@ -91,6 +94,7 @@ export async function loadGallery(profileId: string): Promise<GalleryPayload> {
       name: official?.name ?? set.name,
       logoUrl: official?.logoUrl ?? null,
       symbolUrl: official?.symbolUrl ?? null,
+      artUrl: set.iconUrl ?? set.imageUrl ?? null,
       releaseDate: set.releaseDate?.toISOString() ?? null,
       totalCards: total,
       ownedCards,
@@ -102,7 +106,7 @@ export async function loadGallery(profileId: string): Promise<GalleryPayload> {
     const seriesInfo = official ? { id: official.seriesId, name: official.seriesName } : OTHER;
     const time = set.releaseDate?.getTime() ?? 0;
     const group = bySeries.get(seriesInfo.id) ?? { series: { ...seriesInfo, sets: [] }, newest: 0, entries: [] };
-    group.entries.push({ dto, time });
+    group.entries.push({ dto, time, id: set.id });
     group.newest = Math.max(group.newest, time);
     bySeries.set(seriesInfo.id, group);
   }
@@ -111,7 +115,10 @@ export async function loadGallery(profileId: string): Promise<GalleryPayload> {
     .sort((a, b) => (a.series.id === OTHER.id ? 1 : b.series.id === OTHER.id ? -1 : b.newest - a.newest))
     .map((g) => ({
       ...g.series,
-      sets: g.entries.sort((a, b) => b.time - a.time || a.dto.name.localeCompare(b.dto.name)).map((e) => e.dto),
+      sets: applySetOrder(
+        g.entries.sort((a, b) => b.time - a.time || a.dto.name.localeCompare(b.dto.name)),
+        (e) => chosen.get(e.id),
+      ).map((e) => e.dto),
     }));
 
   const started = [...summaries.values()];
@@ -127,11 +134,35 @@ export async function loadGallery(profileId: string): Promise<GalleryPayload> {
   };
 }
 
+/**
+ * Saves the order one person chose for some sets (the whole series, in the order shown). Unknown slugs are
+ * ignored. Returns how many sets were saved.
+ */
+export async function saveSetOrder(profileId: string, slugs: string[]): Promise<number> {
+  const unique = [...new Set(slugs)].slice(0, MAX_ORDER_SETS);
+  const found = await prisma.cardSet.findMany({ where: { slug: { in: unique } }, select: { id: true, slug: true } });
+  const idBySlug = new Map(found.map((s) => [s.slug, s.id]));
+  const ids = unique.map((slug) => idBySlug.get(slug)).filter((id): id is number => id != null);
+  await prisma.$transaction([
+    prisma.setOrder.deleteMany({ where: { profileId, setId: { in: ids } } }),
+    prisma.setOrder.createMany({ data: ids.map((setId, position) => ({ profileId, setId, position })) }),
+  ]);
+  return ids.length;
+}
+
 /** One set's page: every card with what a person owns, the summary, and the set's other rows. */
 export async function loadCollectionSet(profileId: string, slug: string): Promise<CollectionSetPayload | null> {
-  const set = await prisma.cardSet.findUnique({ where: { slug } });
+  let set = await prisma.cardSet.findUnique({ where: { slug } });
   if (!set) return null;
-  const collection = await loadSetCollection(set, { fetchOfficial: true, profileId });
+  let collection = await loadSetCollection(set, { fetchOfficial: true, profileId });
+
+  // The official list has no art for some sets (McDonald's, promos); tcgapi.dev's pictures fill the gap, but only
+  // once the set's prices are loaded. Do that now, once, rather than leave the cards blank.
+  if (set.itemsFetchedAt == null && collection.cards.some((c) => !c.imageUrl)) {
+    await ensureSetItems(set);
+    set = (await prisma.cardSet.findUnique({ where: { id: set.id } })) ?? set;
+    collection = await loadSetCollection(set, { fetchOfficial: false, profileId });
+  }
 
   const products = collection.items
     .map((i) => ({ item: i, group: classifyItem(i) }))

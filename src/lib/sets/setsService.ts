@@ -82,13 +82,24 @@ async function saveSets(sets: ParsedSet[]): Promise<void> {
         // itemsFetchedAt is left alone on update — refreshing the list must not
         // make an already-cached set look unfetched.
         create: { ...s, fetchedAt: now },
-        update: { ...s, fetchedAt: now },
+        // A set's icon and picture don't change: keep the saved ones if the API stops sending them.
+        update: {
+          ...s,
+          iconUrl: s.iconUrl ?? undefined,
+          imageUrl: s.imageUrl ?? undefined,
+          fetchedAt: now,
+        },
       }),
     ),
   );
 }
 
 async function saveItems(setId: number, items: ParsedItem[]): Promise<void> {
+  // Card pictures don't change while prices do: when a refresh arrives without a picture, keep the one we had.
+  const knownArt = new Map(
+    (await prisma.setItem.findMany({ where: { setId, imageUrl: { not: null } }, select: { externalId: true, printing: true, imageUrl: true } })).map((r) => [`${r.externalId}|${r.printing}`, r.imageUrl]),
+  );
+  items = items.map((i) => (i.imageUrl ? i : { ...i, imageUrl: knownArt.get(`${i.externalId}|${i.printing}`) ?? null }));
   const chunks: ParsedItem[][] = [];
   for (let i = 0; i < items.length; i += INSERT_CHUNK) chunks.push(items.slice(i, i + INSERT_CHUNK));
   // Replace in one transaction, only after every page arrived, so a failure
@@ -196,6 +207,16 @@ function refreshSetItems(set: CardSet): Promise<string | null> {
     }
     return null;
   });
+}
+
+/**
+ * Loads a set's prices (and the card pictures that come with them) when it has none saved yet. Used by the
+ * collection page, so a set whose official list has no art (McDonald's, promos) isn't left blank. Respects
+ * the same budget guard as every other fetch; returns an error message or null.
+ */
+export async function ensureSetItems(set: CardSet): Promise<string | null> {
+  if (set.itemsFetchedAt != null) return null;
+  return refreshSetItems(set);
 }
 
 export interface LoadPricesResult {

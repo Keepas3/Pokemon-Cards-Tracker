@@ -89,6 +89,19 @@ export default function PokemonGallery() {
   }
 
   const followingCount = data?.totals.collecting ?? 0;
+  // Cards you own in each generation (the count each tile shows, or the name-matched count until its card list is loaded).
+  const ownedByGen = useMemo(() => {
+    const perGen = new Map<number, number>();
+    let total = 0;
+    for (const p of data?.species ?? []) {
+      const n = p.ownedCards ?? p.haveCards;
+      if (!n) continue;
+      total += n;
+      const g = GENERATIONS.find((x) => p.dexId >= x.first && p.dexId <= x.last);
+      if (g) perGen.set(g.gen, (perGen.get(g.gen) ?? 0) + n);
+    }
+    return { perGen, total };
+  }, [data]);
   const bookmarkedCount = (data?.species ?? []).filter((p) => follows[p.dexId] ?? p.followed).length;
   // Until you choose, show the ones you follow if there are any, otherwise everything.
   const active: Filter = filter ?? (followingCount > 0 ? "following" : "all");
@@ -152,16 +165,16 @@ export default function PokemonGallery() {
             onChange={(f) => reset(() => setFilter(f))}
             items={[
               { key: "following", label: "My Pokémon", count: followingCount },
-              { key: "bookmarked", label: "Bookmarked", count: bookmarkedCount },
               { key: "all", label: "All Pokémon", count: data.species.length },
+              { key: "bookmarked", label: "Bookmarked", count: bookmarkedCount },
             ]}
           />
           <div className="flex flex-wrap items-center gap-2">
             <select value={gen} onChange={(e) => reset(() => setGen(e.target.value))} aria-label="Generation" className="input">
-              <option value="">All generations</option>
+              <option value="">All generations · {ownedByGen.total}</option>
               {GENERATIONS.map((g) => (
                 <option key={g.gen} value={g.gen}>
-                  Gen {g.gen} ({g.first}–{g.last})
+                  Gen {g.gen} ({g.first}–{g.last}) · {ownedByGen.perGen.get(g.gen) ?? 0}
                 </option>
               ))}
             </select>

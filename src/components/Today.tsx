@@ -55,7 +55,10 @@ export default function Today() {
 
   const { digest, smartWatches } = data;
   const deals = data.deals ?? [];
-  const empty = digestIsEmpty(digest) && deals.length === 0;
+  // Packs, tins & boxes: the best few deals, shown cheapest first.
+  const productDeals = [...(data.productDeals ?? [])].sort((a, b) => a.lowCents - b.lowCents);
+  const dealCount = (data.dealsFound ?? 0) + (data.productDealsFound ?? 0);
+  const empty = digestIsEmpty(digest) && deals.length === 0 && productDeals.length === 0;
   const activeAlerts = smartWatches.filter((w) => w.enabled);
   const matchCount = digest.smartAlerts.reduce((n, g) => n + g.items.length, 0);
 
@@ -74,7 +77,7 @@ export default function Today() {
       <div className="grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-[minmax(0,1fr)_17rem]">
         <div className="space-y-6">
           <div className="grid grid-cols-3 gap-3">
-            <Stat label="Deals" value={data.dealsFound ?? 0} tone={(data.dealsFound ?? 0) > 0 ? "good" : "default"} />
+            <Stat label="Deals" value={dealCount} tone={dealCount > 0 ? "good" : "default"} />
             <Stat label="Alert matches" value={matchCount} tone={matchCount > 0 ? "accent" : "default"} />
             <Stat label="Price moves" value={digest.cardMoves.length} />
           </div>
@@ -95,6 +98,24 @@ export default function Today() {
               </Link>
               .
             </EmptyState>
+          )}
+
+          {productDeals.length > 0 && (
+            <section className="space-y-2">
+              <h2 className="flex items-baseline justify-between gap-2 text-xs font-medium uppercase tracking-wide text-subtle">
+                <span>
+                  Deals on packs, tins &amp; boxes <span className="num normal-case tracking-normal">{data.productDealsFound}</span>
+                </span>
+                <Link href="/collection/deals?kind=products" className="link normal-case tracking-normal">
+                  See all
+                </Link>
+              </h2>
+              <ul className="card divide-y divide-line">
+                {productDeals.map((d) => (
+                  <DealRow key={`${d.setId}|${d.key}`} deal={d} />
+                ))}
+              </ul>
+            </section>
           )}
 
           {deals.length > 0 && (

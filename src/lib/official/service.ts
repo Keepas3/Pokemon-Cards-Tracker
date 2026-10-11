@@ -102,8 +102,9 @@ export async function ensureOfficialIndex(
                 name: s.name,
                 seriesId: s.seriesId,
                 seriesName: s.seriesName,
-                logoUrl: s.logoUrl,
-                symbolUrl: s.symbolUrl,
+                // Logos never change, so one that was saved is kept even if the catalog stops listing it.
+                ...(s.logoUrl ? { logoUrl: s.logoUrl } : {}),
+                ...(s.symbolUrl ? { symbolUrl: s.symbolUrl } : {}),
                 totalCards: s.totalCards,
                 officialCards: s.officialCards,
                 fetchedAt: now,
